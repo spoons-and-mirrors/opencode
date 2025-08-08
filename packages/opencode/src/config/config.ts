@@ -164,6 +164,15 @@ export namespace Config {
   export const Mcp = z.discriminatedUnion("type", [McpLocal, McpRemote])
   export type Mcp = z.infer<typeof Mcp>
 
+  export const Resource = z
+    .object({
+      path: z.string(),
+      description: z.string(),
+    })
+    .openapi({
+      ref: "Resource",
+    })
+
   export const Agent = z
     .object({
       model: z.string().optional(),
@@ -174,6 +183,9 @@ export namespace Config {
       disable: z.boolean().optional(),
       description: z.string().optional().describe("Description of when to use the agent"),
       mode: z.union([z.literal("subagent"), z.literal("primary"), z.literal("all")]).optional(),
+      mcp: z.record(z.string(), Mcp).optional(),
+      instructions: z.array(z.string()).optional(),
+      resources: z.array(z.union([z.string(), Resource])).optional(),
     })
     .openapi({
       ref: "AgentConfig",

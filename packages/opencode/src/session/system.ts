@@ -3,6 +3,7 @@ import { Ripgrep } from "../file/ripgrep"
 import { Global } from "../global"
 import { Filesystem } from "../util/filesystem"
 import { Config } from "../config/config"
+import { Agent } from "../agent/agent"
 import path from "path"
 import os from "os"
 
@@ -57,7 +58,7 @@ export namespace SystemPrompt {
     "CONTEXT.md", // deprecated
   ]
 
-  export async function custom() {
+  export async function custom(agent?: Agent.Info) {
     const { cwd, root } = App.info().path
     const config = await Config.get()
     const paths = new Set<string>()
@@ -70,8 +71,17 @@ export namespace SystemPrompt {
     paths.add(path.join(Global.Path.config, "AGENTS.md"))
     paths.add(path.join(os.homedir(), ".claude", "CLAUDE.md"))
 
+    // Global instructions
     if (config.instructions) {
       for (const instruction of config.instructions) {
+        const matches = await Filesystem.globUp(instruction, cwd, root).catch(() => [])
+        matches.forEach((path) => paths.add(path))
+      }
+    }
+
+    // Agent-specific instructions
+    if (agent?.instructions) {
+      for (const instruction of agent.instructions) {
         const matches = await Filesystem.globUp(instruction, cwd, root).catch(() => [])
         matches.forEach((path) => paths.add(path))
       }

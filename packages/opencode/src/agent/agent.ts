@@ -22,6 +22,9 @@ export namespace Agent {
         .optional(),
       prompt: z.string().optional(),
       tools: z.record(z.boolean()),
+      mcp: z.record(z.string(), Config.Mcp).optional(),
+      instructions: z.array(z.string()).optional(),
+      resources: z.array(z.union([z.string(), Config.Resource])).optional(),
     })
     .openapi({
       ref: "Agent",
@@ -79,6 +82,9 @@ export namespace Agent {
       if (value.temperature != undefined) item.temperature = value.temperature
       if (value.top_p != undefined) item.topP = value.top_p
       if (value.mode) item.mode = value.mode
+      if (value.mcp) item.mcp = value.mcp
+      if (value.instructions) item.instructions = value.instructions
+      if (value.resources) item.resources = value.resources
     }
     return result
   })

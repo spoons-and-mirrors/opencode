@@ -25,6 +25,7 @@ import { Flag } from "../flag/flag"
 import { Identifier } from "../id/id"
 import { Installation } from "../installation"
 import { MCP } from "../mcp"
+import { AgentMCP } from "../mcp/agent"
 import { Provider } from "../provider/provider"
 import { ProviderTransform } from "../provider/transform"
 import type { ModelsDev } from "../provider/models"
@@ -33,11 +34,13 @@ import { Snapshot } from "../snapshot"
 import { Storage } from "../storage/storage"
 import { Log } from "../util/log"
 import { NamedError } from "../util/error"
+import { Filesystem } from "../util/filesystem"
 import { SystemPrompt } from "./system"
 import { FileTime } from "../file/time"
 import { MessageV2 } from "./message-v2"
 import { LSP } from "../lsp"
 import { ReadTool } from "../tool/read"
+import { createResourceTool } from "../tool/resource"
 import { mergeDeep, pipe, splitWhen } from "remeda"
 import { ToolRegistry } from "../tool/registry"
 import { Plugin } from "../plugin"
@@ -725,7 +728,7 @@ export namespace Session {
       })(),
     )
     system.push(...(await SystemPrompt.environment()))
-    system.push(...(await SystemPrompt.custom()))
+    system.push(...(await SystemPrompt.custom(agent)))
     // max 2 system prompt messages for caching purposes
     const [first, ...rest] = system
     system = [first, rest.join("\n")]
@@ -824,6 +827,88 @@ export namespace Session {
       })
     }
 
+    // Agent-specific resource tools
+    if (agent.resources && agent.resources.length > 0) {
+      const { cwd, root } = app.path
+      for (const resource of agent.resources) {
+        try {
+          // Handle both string paths and resource objects
+          const resourcePath = typeof resource === "string" ? resource : resource.path
+          const resourceDescription = typeof resource === "object" ? resource.description : undefined
+
+          const matches = await Filesystem.globUp(resourcePath, cwd, root)
+          for (const matchedPath of matches) {
+            const basePath = path.dirname(matchedPath)
+            const resourceTool = createResourceTool(matchedPath, basePath, resourceDescription)
+            const toolDef = await resourceTool.init()
+
+            if (enabledTools[resourceTool.id] === false) continue
+
+            tools[resourceTool.id] = tool({
+              id: resourceTool.id as any,
+              description: toolDef.description,
+              inputSchema: toolDef.parameters as ZodSchema,
+              async execute(args, options) {
+                await Plugin.trigger(
+                  "tool.execute.before",
+                  {
+                    tool: resourceTool.id,
+                    sessionID: input.sessionID,
+                    callID: options.toolCallId,
+                  },
+                  {
+                    args,
+                  },
+                )
+                const result = await toolDef.execute(args, {
+                  sessionID: input.sessionID,
+                  messageID: assistantMsg.id,
+                  callID: options.toolCallId,
+                  abort: options.abortSignal || new AbortController().signal,
+                  metadata: async (val) => {
+                    const match = processor.partFromToolCall(options.toolCallId)
+                    if (match && match.state.status === "running") {
+                      await updatePart({
+                        ...match,
+                        state: {
+                          title: val.title,
+                          metadata: val.metadata,
+                          status: "running",
+                          input: args,
+                          time: {
+                            start: Date.now(),
+                          },
+                        },
+                      })
+                    }
+                  },
+                })
+                await Plugin.trigger(
+                  "tool.execute.after",
+                  {
+                    tool: resourceTool.id,
+                    sessionID: input.sessionID,
+                    callID: options.toolCallId,
+                  },
+                  {
+                    args,
+                    result,
+                  },
+                )
+                return result
+              },
+            })
+          }
+        } catch (error) {
+          log.error("failed to load resource tools", {
+            resource: typeof resource === "string" ? resource : resource.path,
+            agent: agent.name,
+            error,
+          })
+        }
+      }
+    }
+
     for (const [key, item] of Object.entries(await MCP.tools())) {
       if (enabledTools[key] === false) continue
       const execute = item.execute
@@ -846,6 +931,34 @@ export namespace Session {
         }
       }
       tools[key] = item
+    }
+
+    // Agent-specific MCP tools
+    if (agent.mcp && Object.keys(agent.mcp).length > 0) {
+      const agentMCPTools = await AgentMCP.tools(agent.name, agent.mcp)
+      for (const [key, item] of Object.entries(agentMCPTools)) {
+        if (enabledTools[key] === false) continue
+        const execute = item.execute
+        if (!execute) continue
+        item.execute = async (args, opts) => {
+          const result = await execute(args, opts)
+          const output = result.content
+            .filter((x: any) => x.type === "text")
+            .map((x: any) => x.text)
+            .join("\n\n")
+
+          return {
+            output,
+          }
+        }
+        item.toModelOutput = (result) => {
+          return {
+            type: "text",
+            value: result.output,
+          }
+        }
+        tools[key] = item
+      }
     }
 
     const params = {
