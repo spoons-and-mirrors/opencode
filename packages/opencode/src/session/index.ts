@@ -1345,7 +1345,21 @@ export namespace Session {
           content: [
             {
               type: "text",
-              text: "Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.",
+              text: `
+You are a developer writing a detailed technical summary for a teammate. Your goal is to provide enough context for them to understand the current state and continue the work.
+
+Create a summary in beautiful, fully-featured Markdown that covers the following, in an easy-to-read format:
+
+- Goal: What was the main objective of this session?
+- Progress & Key Findings: What was accomplished or discovered? Mention important files, code changes, or key decisions made.
+- Current Status: Where exactly did we leave off? Note any blockers, errors, or open questions.
+- Next Steps: What is the immediate action items?
+- Files: what file are we working on?
+- Re-state the overall plan moving forward.
+
+Keep the summary concise and focused, like a good commit message or a quick stand-up update. Avoid unnecessary formality.
+
+This summary must be thorough enough to prevent context loss. Do NOT output the summary in a codeblock.`,
             },
           ],
         },
