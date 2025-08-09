@@ -132,6 +132,16 @@ export namespace Session {
       const messages = new Map<string, MessageV2.Info[]>()
       const pending = new Map<string, AbortController>()
       const autoCompacting = new Map<string, boolean>()
+      const pendingToolCalls = new Map<
+        string,
+        {
+          sessionID: string
+          toolCallId: string
+          toolName: string
+          input: any
+          assistantMessageID: string
+        }[]
+      >()
       const queued = new Map<
         string,
         {
@@ -148,6 +158,7 @@ export namespace Session {
         messages,
         pending,
         autoCompacting,
+        pendingToolCalls,
         queued,
       }
     },
@@ -660,6 +671,22 @@ export namespace Session {
       const tokens =
         previous.tokens.input + previous.tokens.cache.read + previous.tokens.cache.write + previous.tokens.output
       if (model.info.limit.context && tokens > Math.max((model.info.limit.context - outputLimit) * 0.9, 0)) {
+        // Check if we have pending tool calls from mid-stream compaction
+        const pendingCalls = state().pendingToolCalls.get(input.sessionID) ?? []
+        if (pendingCalls.length > 0) {
+          log.info("Skipping pre-chat compaction due to pending tool calls from mid-stream compaction")
+          state().pendingToolCalls.delete(input.sessionID)
+          state().autoCompacting.delete(input.sessionID)
+          // Execute the pending calls directly
+          return executePendingToolCalls({
+            sessionID: input.sessionID,
+            providerID: input.providerID,
+            modelID: input.modelID,
+            agent: inputAgent,
+            pendingCalls,
+          })
+        }
+
         state().autoCompacting.set(input.sessionID, true)
 
         await summarize({
@@ -759,7 +786,7 @@ export namespace Session {
     await updateMessage(assistantMsg)
     const tools: Record<string, AITool> = {}
 
-    const processor = createProcessor(assistantMsg, model.info)
+    const processor = createProcessor(assistantMsg, model.info, abort.signal)
 
     const enabledTools = pipe(
       agent.tools,
@@ -980,7 +1007,42 @@ export namespace Session {
     return result
   }
 
-  function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model) {
+  function shouldCompactMidStream(
+    sessionID: string,
+    model: ModelsDev.Model,
+    assistantMsg: MessageV2.Assistant,
+  ): boolean {
+    // Don't compact if already auto-compacting
+    if (state().autoCompacting.get(sessionID)) return false
+
+    // Don't compact if no context limit
+    if (!model.limit.context) return false
+
+    // Don't compact if this message is already a summary
+    if (assistantMsg.summary) return false
+
+    // Check for recent summarization to prevent infinite loops
+    const recentMessages = state().messages.get(sessionID) ?? []
+    const recentSummaries = recentMessages.filter(
+      (msg) => msg.role === "assistant" && msg.summary && Date.now() - msg.time.created < 30000, // 30 seconds
+    )
+    if (recentSummaries.length > 0) {
+      log.info("Skipping mid-stream compaction due to recent summary", { sessionID })
+      return false
+    }
+
+    const outputLimit = Math.min(model.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
+    const currentTokens =
+      assistantMsg.tokens.input +
+      assistantMsg.tokens.cache.read +
+      assistantMsg.tokens.cache.write +
+      assistantMsg.tokens.output
+
+    const threshold = Math.max((model.limit.context - outputLimit) * 0.9, 0)
+    return currentTokens > threshold
+  }
+
+  function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model, abortSignal: AbortSignal) {
     const toolcalls: Record<string, MessageV2.ToolPart> = {}
     let snapshot: string | undefined
     return {
@@ -1021,6 +1083,32 @@ export namespace Session {
                 break
 
               case "tool-call": {
+                // Check if we should compact mid-stream before executing tool
+                if (shouldCompactMidStream(assistantMsg.sessionID, model, assistantMsg)) {
+                  log.info("mid-stream compaction triggered", {
+                    sessionID: assistantMsg.sessionID,
+                    toolCallId: value.toolCallId,
+                    toolName: value.toolName,
+                  })
+
+                  // Store the pending tool call
+                  const pendingCalls = state().pendingToolCalls.get(assistantMsg.sessionID) ?? []
+                  pendingCalls.push({
+                    sessionID: assistantMsg.sessionID,
+                    toolCallId: value.toolCallId,
+                    toolName: value.toolName,
+                    input: value.input,
+                    assistantMessageID: assistantMsg.id,
+                  })
+                  state().pendingToolCalls.set(assistantMsg.sessionID, pendingCalls)
+
+                  // Mark as auto-compacting to prevent infinite loops
+                  state().autoCompacting.set(assistantMsg.sessionID, true)
+
+                  // Abort current stream early to trigger compaction
+                  throw new MidStreamCompactionError(assistantMsg.sessionID)
+                }
+
                 const match = toolcalls[value.toolCallId]
                 if (match) {
                   const part = await updatePart({
@@ -1170,6 +1258,72 @@ export namespace Session {
           log.error("", {
             error: e,
           })
+
+          // Handle mid-stream compaction specially
+          if (e instanceof MidStreamCompactionError) {
+            assistantMsg.time.completed = Date.now()
+            await updateMessage(assistantMsg)
+
+            // Trigger summarization using internal function (no additional lock needed)
+            await summarizeInternal(
+              {
+                sessionID: assistantMsg.sessionID,
+                providerID: assistantMsg.providerID,
+                modelID: assistantMsg.modelID,
+              },
+              abortSignal,
+            )
+
+            // Process pending tool calls in a new chat session
+            const pendingCalls = state().pendingToolCalls.get(assistantMsg.sessionID) ?? []
+            state().pendingToolCalls.delete(assistantMsg.sessionID)
+            state().autoCompacting.delete(assistantMsg.sessionID)
+
+            if (pendingCalls.length > 0) {
+              // Execute pending tool calls and then restart agent conversation
+              await executePendingToolCalls({
+                sessionID: assistantMsg.sessionID,
+                providerID: assistantMsg.providerID,
+                modelID: assistantMsg.modelID,
+                agent: assistantMsg.mode,
+                pendingCalls,
+              })
+
+              // IMPORTANT: We cannot call chat() synchronously here because we still hold the session lock.
+              // Doing so would cause the inner chat invocation to enqueue itself (since the lock is held)
+              // and return a promise that never resolves until the outer chat finishes, producing a deadlock
+              // and a perpetual "working..." state in the UI.
+              //
+              // Instead, schedule the continuation asynchronously after the current call stack unwinds and the
+              // lock has been released. We return the current assistant message so the UI can complete this
+              // message; the scheduled continuation will create a new assistant message that resumes reasoning.
+              const continuationInput = {
+                sessionID: assistantMsg.sessionID,
+                providerID: assistantMsg.providerID,
+                modelID: assistantMsg.modelID,
+                agent: assistantMsg.mode,
+                messageID: Identifier.ascending("message"),
+                parts: [
+                  {
+                    id: Identifier.ascending("part"),
+                    type: "text" as const,
+                    text: "Continue with your work.",
+                    synthetic: true,
+                  },
+                ],
+              }
+              setTimeout(() => {
+                chat(continuationInput).catch((e) => {
+                  log.error("continuation chat failed", { error: e })
+                })
+              }, 0)
+              const p2 = await getParts(assistantMsg.sessionID, assistantMsg.id)
+              return { info: assistantMsg, parts: p2 }
+            }
+            const p = await getParts(assistantMsg.sessionID, assistantMsg.id)
+            return { info: assistantMsg, parts: p }
+          }
+
           switch (true) {
             case e instanceof DOMException && e.name === "AbortError":
               assistantMsg.error = new MessageV2.AbortedError(
@@ -1290,6 +1444,13 @@ export namespace Session {
 
   export async function summarize(input: { sessionID: string; providerID: string; modelID: string }) {
     using abort = lock(input.sessionID)
+    return await summarizeInternal(input, abort.signal)
+  }
+
+  async function summarizeInternal(
+    input: { sessionID: string; providerID: string; modelID: string },
+    abortSignal: AbortSignal,
+  ) {
     const msgs = await messages(input.sessionID)
     const lastSummary = msgs.findLast((msg) => msg.info.role === "assistant" && msg.info.summary === true)
     const filtered = msgs.filter((msg) => !lastSummary || msg.info.id >= lastSummary.info.id)
@@ -1327,10 +1488,10 @@ export namespace Session {
     }
     await updateMessage(next)
 
-    const processor = createProcessor(next, model.info)
+    const processor = createProcessor(next, model.info, abortSignal)
     const stream = streamText({
       maxRetries: 10,
-      abortSignal: abort.signal,
+      abortSignal: abortSignal,
       model: model.language,
       messages: [
         ...system.map(
@@ -1415,6 +1576,142 @@ export namespace Session {
     constructor(public readonly sessionID: string) {
       super(`Session ${sessionID} is busy`)
     }
+  }
+
+  export class MidStreamCompactionError extends Error {
+    constructor(public readonly sessionID: string) {
+      super(`Mid-stream compaction triggered for session ${sessionID}`)
+    }
+  }
+
+  async function executePendingToolCalls(input: {
+    sessionID: string
+    providerID: string
+    modelID: string
+    agent: string
+    pendingCalls: {
+      sessionID: string
+      toolCallId: string
+      toolName: string
+      input: any
+      assistantMessageID: string
+    }[]
+  }) {
+    const app = App.info()
+
+    // Create a new assistant message for the deferred tool execution
+    const assistantMsg: MessageV2.Info = {
+      id: Identifier.ascending("message"),
+      role: "assistant",
+      system: [], // Will be populated if needed
+      mode: input.agent,
+      path: {
+        cwd: app.path.cwd,
+        root: app.path.root,
+      },
+      cost: 0,
+      tokens: {
+        input: 0,
+        output: 0,
+        reasoning: 0,
+        cache: { read: 0, write: 0 },
+      },
+      modelID: input.modelID,
+      providerID: input.providerID,
+      time: {
+        created: Date.now(),
+      },
+      sessionID: input.sessionID,
+    }
+    await updateMessage(assistantMsg)
+
+    // Add a text part explaining the deferred execution
+    await updatePart({
+      id: Identifier.ascending("part"),
+      messageID: assistantMsg.id,
+      sessionID: input.sessionID,
+      type: "text",
+      text: "Continuing with deferred tool execution after compaction:",
+      time: {
+        start: Date.now(),
+        end: Date.now(),
+      },
+    })
+
+    // Execute each pending tool call
+    for (const pendingCall of input.pendingCalls) {
+      const toolRegistry = await ToolRegistry.tools(input.providerID, input.modelID)
+      const toolDef = toolRegistry.find((t) => t.id === pendingCall.toolName)
+
+      if (!toolDef) {
+        log.error("Tool not found for deferred execution", { toolName: pendingCall.toolName })
+        continue
+      }
+
+      // Create tool part
+      const toolPart = (await updatePart({
+        id: Identifier.ascending("part"),
+        messageID: assistantMsg.id,
+        sessionID: input.sessionID,
+        type: "tool",
+        tool: pendingCall.toolName,
+        callID: pendingCall.toolCallId,
+        state: {
+          status: "running",
+          input: pendingCall.input,
+          time: {
+            start: Date.now(),
+          },
+        },
+      })) as MessageV2.ToolPart
+
+      try {
+        // Execute the tool
+        const result = await toolDef.execute(pendingCall.input, {
+          sessionID: input.sessionID,
+          abort: new AbortController().signal,
+          messageID: assistantMsg.id,
+          callID: pendingCall.toolCallId,
+          metadata: async () => {}, // No-op for deferred calls
+        })
+
+        // Update with result
+        await updatePart({
+          ...toolPart,
+          state: {
+            status: "completed",
+            input: pendingCall.input,
+            output: result.output,
+            metadata: result.metadata,
+            title: result.title,
+            time: {
+              start: toolPart.state.status === "running" ? toolPart.state.time.start : Date.now(),
+              end: Date.now(),
+            },
+          },
+        })
+      } catch (error) {
+        // Update with error
+        await updatePart({
+          ...toolPart,
+          state: {
+            status: "error",
+            input: pendingCall.input,
+            error: (error as Error).toString(),
+            time: {
+              start: toolPart.state.status === "running" ? toolPart.state.time.start : Date.now(),
+              end: Date.now(),
+            },
+          },
+        })
+      }
+    }
+
+    assistantMsg.time.completed = Date.now()
+    await updateMessage(assistantMsg)
+
+    const parts = await getParts(input.sessionID, assistantMsg.id)
+    return { info: assistantMsg, parts }
   }
 
   export async function initialize(input: {
