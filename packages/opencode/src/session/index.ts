@@ -144,6 +144,7 @@ export namespace Session {
           callback: (input: { info: MessageV2.Assistant; parts: MessageV2.Part[] }) => void
         }[]
       >()
+      const agentOverrides = new Map<string, Record<string, Record<string, boolean>>>()
 
       return {
         sessions,
@@ -151,6 +152,7 @@ export namespace Session {
         pending,
         autoCompacting,
         queued,
+        agentOverrides,
       }
     },
     async (state) => {
@@ -159,6 +161,25 @@ export namespace Session {
       }
     },
   )
+
+  export function setAgentOverrides(sessionID: string, agentName: string, overrides: Record<string, boolean>) {
+    const sessionOverrides = state().agentOverrides.get(sessionID) ?? {}
+    sessionOverrides[agentName] = overrides
+    state().agentOverrides.set(sessionID, sessionOverrides)
+  }
+
+  export function getAgentOverrides(sessionID: string, agentName?: string): Record<string, boolean> {
+    const sessionOverrides = state().agentOverrides.get(sessionID) ?? {}
+    if (agentName) {
+      return sessionOverrides[agentName] ?? {}
+    }
+    // Return all overrides for all agents if no agentName specified
+    const allOverrides: Record<string, boolean> = {}
+    for (const [_, overrides] of Object.entries(sessionOverrides)) {
+      Object.assign(allOverrides, overrides)
+    }
+    return allOverrides
+  }
 
   export async function create(parentID?: string) {
     const result: Info = {
@@ -328,6 +349,7 @@ export namespace Session {
       await Storage.removeDir(`session/message/${sessionID}/`).catch(() => {})
       state().sessions.delete(sessionID)
       state().messages.delete(sessionID)
+      state().agentOverrides.delete(sessionID)
       if (emitEvent) {
         Bus.publish(Event.Deleted, {
           info: session,
@@ -361,6 +383,7 @@ export namespace Session {
     agent: z.string().optional(),
     system: z.string().optional(),
     tools: z.record(z.boolean()).optional(),
+    agents: z.record(z.boolean()).optional(),
     parts: z.array(
       z.discriminatedUnion("type", [
         MessageV2.TextPart.omit({
@@ -769,11 +792,41 @@ export namespace Session {
       mergeDeep(await ToolRegistry.enabled(input.providerID, input.modelID, agent)),
       mergeDeep(input.tools ?? {}),
     )
+
+    // Store agent overrides for tools to access
+    if (input.agents && input.agent) {
+      setAgentOverrides(input.sessionID, input.agent, input.agents)
+    }
+
     for (const item of await ToolRegistry.tools(input.providerID, input.modelID)) {
       if (Wildcard.all(item.id, enabledTools) === false) continue
+      if (enabledTools[item.id] === false) continue
+      // Dynamically filter agent descriptions for the task tool based on session overrides
+      let description = item.description
+      if (item.id === "task") {
+        if (input.agents && Object.keys(input.agents).length > 0) {
+          // Get available agents and filter out disabled ones
+          const availableAgents = await Agent.list().then((x) =>
+            x.filter((a) => a.mode !== "primary" && input.agents![a.name] !== false),
+          )
+          // Rebuild the description with only enabled agents
+          const agentList = availableAgents
+            .map((a) => `- ${a.name}: ${a.description ?? "This subagent should only be called manually by the user."}`)
+            .join("\n")
+          // Replace placeholder with filtered agents
+          description = description.replace("{agents}", agentList)
+        } else {
+          // No filtering needed, show all non-primary agents
+          const allAgents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
+          const agentList = allAgents
+            .map((a) => `- ${a.name}: ${a.description ?? "This subagent should only be called manually by the user."}`)
+            .join("\n")
+          description = description.replace("{agents}", agentList)
+        }
+      }
       tools[item.id] = tool({
         id: item.id as any,
-        description: item.description,
+        description: description,
         inputSchema: item.parameters as ZodSchema,
         async execute(args, options) {
           await Plugin.trigger(

@@ -40,6 +40,9 @@ type State struct {
 	MessageHistory     []Prompt              `toml:"message_history"`
 	ShowToolDetails    *bool                 `toml:"show_tool_details"`
 	ShowThinkingBlocks *bool                 `toml:"show_thinking_blocks"`
+	// Persistent tool/agent preferences per agent
+	ToolOverrides  map[string]map[string]bool `toml:"tool_overrides,omitempty"`  // agent -> tool -> enabled
+	AgentOverrides map[string]map[string]bool `toml:"agent_overrides,omitempty"` // agent -> subagent -> enabled
 }
 
 func NewState() *State {
@@ -50,6 +53,8 @@ func NewState() *State {
 		RecentlyUsedModels: make([]ModelUsage, 0),
 		RecentlyUsedAgents: make([]AgentUsage, 0),
 		MessageHistory:     make([]Prompt, 0),
+		ToolOverrides:      make(map[string]map[string]bool),
+		AgentOverrides:     make(map[string]map[string]bool),
 	}
 }
 

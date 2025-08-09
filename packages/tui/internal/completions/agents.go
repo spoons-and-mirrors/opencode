@@ -48,6 +48,11 @@ func (cg *agentsContextGroup) GetChildEntries(
 		if agent.Mode == opencode.AgentModePrimary {
 			continue
 		}
+		// Check if agent is disabled by effective overrides for the current agent
+		currentAgentOverrides := cg.app.GetEffectiveAgentOverrides(cg.app.Agent().Name)
+		if enabled, exists := currentAgentOverrides[agent.Name]; exists && !enabled {
+			continue
+		}
 
 		displayFunc := func(s styles.Style) string {
 			t := theme.CurrentTheme()

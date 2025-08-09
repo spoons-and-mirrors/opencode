@@ -8,26 +8,31 @@ import { Identifier } from "../id/id"
 import { Agent } from "../agent/agent"
 
 export const TaskTool = Tool.define("task", async () => {
-  const agents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
-  const description = DESCRIPTION.replace(
-    "{agents}",
-    agents
-      .map((a) => `- ${a.name}: ${a.description ?? "This subagent should only be called manually by the user."}`)
-      .join("\n"),
-  )
+  // Keep the original description with placeholder for dynamic replacement
   return {
-    description,
+    description: DESCRIPTION,
     parameters: z.object({
       description: z.string().describe("A short (3-5 words) description of the task"),
       prompt: z.string().describe("The task for the agent to perform"),
       subagent_type: z.string().describe("The type of specialized agent to use for this task"),
     }),
     async execute(params, ctx) {
+      // Check if the requested agent is disabled by session overrides
+      if (ctx.sessionID && ctx.agent) {
+        const agentOverrides = Session.getAgentOverrides(ctx.sessionID, ctx.agent)
+        // Use same logic as autocomplete: if explicitly set to false, block it
+        if (agentOverrides[params.subagent_type] === false) {
+          throw new Error(`Agent ${params.subagent_type} is disabled in the current session`)
+        }
+      }
+
+      // Check if the requested agent exists
+      const agent = await Agent.get(params.subagent_type)
+      if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
+
       const session = await Session.create(ctx.sessionID)
       const msg = await Session.getMessage(ctx.sessionID, ctx.messageID)
       if (msg.info.role !== "assistant") throw new Error("Not an assistant message")
-      const agent = await Agent.get(params.subagent_type)
-      if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
       const messageID = Identifier.ascending("message")
       const parts: Record<string, MessageV2.ToolPart> = {}
       const unsub = Bus.subscribe(MessageV2.Event.PartUpdated, async (evt) => {

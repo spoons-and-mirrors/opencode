@@ -94,6 +94,36 @@ export namespace ToolRegistry {
     return result
   }
 
+  export async function getResourceInfo(): Promise<Record<string, any>> {
+    const result: Record<string, any> = {}
+    // Create a default agent info for resource listing - use permissive defaults
+    const defaultAgent: Agent.Info = {
+      name: "default",
+      mode: "primary",
+      permission: {
+        edit: "allow",
+        bash: { "*": "allow" },
+        webfetch: "allow",
+      },
+      tools: {},
+      options: {},
+    }
+    const enabled = await ToolRegistry.enabled("", "", defaultAgent)
+
+    for (const tool of ALL) {
+      const toolId = tool.id
+      result[toolId] = {
+        name: toolId,
+        description: (await tool.init()).description || "",
+        type: "tool",
+        source: "builtin",
+        defaultEnabled: enabled[toolId] !== false,
+      }
+    }
+
+    return result
+  }
+
   function sanitizeGeminiParameters(schema: z.ZodTypeAny, visited = new Set()): z.ZodTypeAny {
     if (!schema || visited.has(schema)) {
       return schema

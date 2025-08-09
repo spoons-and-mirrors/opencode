@@ -155,4 +155,21 @@ export namespace MCP {
     }
     return result
   }
+
+  export async function getResourceInfo(): Promise<Record<string, any>> {
+    const mcpTools = await tools()
+    const result: Record<string, any> = {}
+
+    for (const [toolName, tool] of Object.entries(mcpTools)) {
+      result[toolName] = {
+        name: toolName,
+        description: tool.description || "",
+        type: "tool",
+        source: "mcp",
+        defaultEnabled: true,
+      }
+    }
+
+    return result
+  }
 }

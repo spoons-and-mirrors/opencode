@@ -607,6 +607,43 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updated, cmd := a.app.SwitchToAgent(msg.AgentName)
 		a.app = updated
 		cmds = append(cmds, cmd)
+		// Find the agent index
+		for i, agent := range a.app.Agents {
+			if agent.Name == msg.AgentName {
+				a.app.AgentIndex = i
+				break
+			}
+		}
+		a.app.State.Agent = msg.AgentName
+
+		// Switch to the agent's preferred model if available
+		if model, ok := a.app.State.AgentModel[msg.AgentName]; ok {
+			for _, provider := range a.app.Providers {
+				if provider.ID == model.ProviderID {
+					a.app.Provider = &provider
+					for _, m := range provider.Models {
+						if m.ID == model.ModelID {
+							a.app.Model = &m
+							break
+						}
+					}
+					break
+				}
+			}
+		}
+		cmds = append(cmds, a.app.SaveState())
+	case app.ToolsUpdatedMsg:
+		if a.app.HasActiveSession() {
+			a.app.SetPersistentToolOverrides(msg.Agent, msg.Overrides)
+			cmds = append(cmds, a.app.SaveState())
+			cmds = append(cmds, toast.NewSuccessToast("Tools updated"))
+		}
+	case app.AgentsUpdatedMsg:
+		if a.app.HasActiveSession() {
+			a.app.SetPersistentAgentOverrides(a.app.Agent().Name, msg.Overrides)
+			cmds = append(cmds, a.app.SaveState())
+			cmds = append(cmds, toast.NewSuccessToast("Agents updated"))
+		}
 	case dialog.ThemeSelectedMsg:
 		a.app.State.Theme = msg.ThemeName
 		cmds = append(cmds, a.app.SaveState())
@@ -657,6 +694,9 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "/tui/open-models":
 			modelDialog := dialog.NewModelDialog(a.app)
 			a.modal = modelDialog
+		case "/tui/open-tools":
+			toolsDialog := dialog.NewToolsDialog(a.app)
+			a.modal = toolsDialog
 		case "/tui/append-prompt":
 			var body struct {
 				Text string `json:"text"`
@@ -1163,6 +1203,9 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		updated, cmd := a.app.CycleRecentModel()
 		a.app = updated
 		cmds = append(cmds, cmd)
+	case commands.ToolListCommand:
+		toolsDialog := dialog.NewToolsDialog(a.app)
+		a.modal = toolsDialog
 	case commands.ThemeListCommand:
 		themeDialog := dialog.NewThemeDialog()
 		a.modal = themeDialog

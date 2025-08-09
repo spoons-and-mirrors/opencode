@@ -237,6 +237,16 @@ func (s *SearchDialog) GetQuery() string {
 	return s.textInput.Value()
 }
 
+// GetSelectedItem returns the currently selected item and its index
+func (s *SearchDialog) GetSelectedItem() (list.Item, int) {
+	return s.list.GetSelectedItem()
+}
+
+// SetSelectedIndex sets the selected index
+func (s *SearchDialog) SetSelectedIndex(idx int) {
+	s.list.SetSelectedIndex(idx)
+}
+
 // SetQuery sets the search query
 func (s *SearchDialog) SetQuery(query string) {
 	s.textInput.SetValue(query)
