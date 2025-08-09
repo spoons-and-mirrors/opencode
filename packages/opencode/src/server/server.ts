@@ -20,6 +20,8 @@ import { callTui, TuiRoute } from "./tui"
 import { Permission } from "../permission"
 import { lazy } from "../util/lazy"
 import { Agent } from "../agent/agent"
+import { ToolRegistry } from "../tool/registry"
+import { MCP } from "../mcp"
 
 const ERRORS = {
   400: {
@@ -961,6 +963,48 @@ export namespace Server {
         async (c) => {
           const modes = await Agent.list()
           return c.json(modes)
+        },
+      )
+      .get(
+        "/app/resources/:type",
+        describeRoute({
+          description: "List all available resources (tools or agents)",
+          operationId: "app.resources",
+          responses: {
+            200: {
+              description: "List of resources",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.record(
+                      z.string(),
+                      z.object({
+                        name: z.string(),
+                        description: z.string().optional(),
+                        type: z.enum(["tool", "agent"]),
+                        source: z.string(),
+                        defaultEnabled: z.boolean().optional().default(true),
+                      }),
+                    ),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        async (c) => {
+          const type = c.req.param("type") as "tool" | "agent"
+          if (type !== "tool" && type !== "agent") {
+            return c.json({ error: "Invalid resource type. Must be 'tool' or 'agent'" }, 400)
+          }
+
+          if (type === "tool") {
+            const builtin = await ToolRegistry.getResourceInfo()
+            const mcp = await MCP.getResourceInfo()
+            return c.json({ ...builtin, ...mcp })
+          } else {
+            return c.json(await Agent.getResourceInfo())
+          }
         },
       )
       .post(
