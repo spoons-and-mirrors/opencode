@@ -1053,7 +1053,7 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		// TODO: block until compaction is complete
-		a.app.CompactSession(context.Background())
+		a.app.CompactSession(context.Background(), "")
 	case commands.SessionExportCommand:
 		if a.app.Session.ID == "" {
 			return a, toast.NewErrorToast("No active session to export.")

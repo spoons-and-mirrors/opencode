@@ -291,8 +291,9 @@ func TestSessionSummarize(t *testing.T) {
 		context.TODO(),
 		"id",
 		opencode.SessionSummarizeParams{
-			ModelID:    opencode.F("modelID"),
-			ProviderID: opencode.F("providerID"),
+			ModelID:          opencode.F("modelID"),
+			ProviderID:       opencode.F("providerID"),
+			ExtraInstruction: opencode.F("include action items"),
 		},
 	)
 	if err != nil {

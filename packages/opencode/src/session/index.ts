@@ -1288,8 +1288,20 @@ export namespace Session {
     return next
   }
 
-  export async function summarize(input: { sessionID: string; providerID: string; modelID: string }) {
+  export async function summarize(input: {
+    sessionID: string
+    providerID: string
+    modelID: string
+    extraInstruction?: string
+  }) {
     using abort = lock(input.sessionID)
+    return await summarizeInternal(input, abort.signal)
+  }
+
+  async function summarizeInternal(
+    input: { sessionID: string; providerID: string; modelID: string; extraInstruction?: string },
+    abortSignal: AbortSignal,
+  ) {
     const msgs = await messages(input.sessionID)
     const lastSummary = msgs.findLast((msg) => msg.info.role === "assistant" && msg.info.summary === true)
     const filtered = msgs.filter((msg) => !lastSummary || msg.info.id >= lastSummary.info.id)
@@ -1330,7 +1342,7 @@ export namespace Session {
     const processor = createProcessor(next, model.info)
     const stream = streamText({
       maxRetries: 10,
-      abortSignal: abort.signal,
+      abortSignal: abortSignal,
       model: model.language,
       messages: [
         ...system.map(
@@ -1345,7 +1357,9 @@ export namespace Session {
           content: [
             {
               type: "text",
-              text: "Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next.",
+              text:
+                "Provide a detailed but concise summary of our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next." +
+                (input.extraInstruction ? "\n\nAdditional instruction: " + input.extraInstruction : ""),
             },
           ],
         },

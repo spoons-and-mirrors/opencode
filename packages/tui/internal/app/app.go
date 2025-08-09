@@ -526,7 +526,7 @@ func (a *App) InitializeProject(ctx context.Context) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (a *App) CompactSession(ctx context.Context) tea.Cmd {
+func (a *App) CompactSession(ctx context.Context, extraInstruction string) tea.Cmd {
 	if a.compactCancel != nil {
 		a.compactCancel()
 	}
@@ -543,8 +543,9 @@ func (a *App) CompactSession(ctx context.Context) tea.Cmd {
 			compactCtx,
 			a.Session.ID,
 			opencode.SessionSummarizeParams{
-				ProviderID: opencode.F(a.Provider.ID),
-				ModelID:    opencode.F(a.Model.ID),
+				ProviderID:       opencode.F(a.Provider.ID),
+				ModelID:          opencode.F(a.Model.ID),
+				ExtraInstruction: opencode.F(extraInstruction),
 			},
 		)
 		if err != nil {

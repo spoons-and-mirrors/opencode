@@ -1262,6 +1262,7 @@ export type SessionSummarizeData = {
   body?: {
     providerID: string
     modelID: string
+    extraInstruction?: string
   }
   path: {
     /**

@@ -2267,8 +2267,9 @@ func (r SessionRevertParams) MarshalJSON() (data []byte, err error) {
 }
 
 type SessionSummarizeParams struct {
-	ModelID    param.Field[string] `json:"modelID,required"`
-	ProviderID param.Field[string] `json:"providerID,required"`
+	ModelID          param.Field[string] `json:"modelID,required"`
+	ProviderID       param.Field[string] `json:"providerID,required"`
+	ExtraInstruction param.Field[string] `json:"extraInstruction"`
 }
 
 func (r SessionSummarizeParams) MarshalJSON() (data []byte, err error) {

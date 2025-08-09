@@ -444,12 +444,13 @@ export namespace Server {
           z.object({
             providerID: z.string(),
             modelID: z.string(),
+            extraInstruction: z.string().optional(),
           }),
         ),
         async (c) => {
           const id = c.req.valid("param").id
           const body = c.req.valid("json")
-          await Session.summarize({ ...body, sessionID: id })
+          await Session.summarize({ ...body, sessionID: id, extraInstruction: body.extraInstruction })
           return c.json(true)
         },
       )

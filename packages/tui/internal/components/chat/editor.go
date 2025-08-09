@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"log/slog"
@@ -558,6 +559,47 @@ func (m *editorComponent) Length() int {
 
 func (m *editorComponent) Submit() (tea.Model, tea.Cmd) {
 	value := strings.TrimSpace(m.Value())
+	if value == "" {
+		return m, nil
+	}
+
+	// Special handling for slash commands with trailing text (eg: /compact do X)
+	if strings.HasPrefix(value, "/") {
+		// Parse command and remainder
+		raw := strings.TrimSpace(value[1:])
+		if raw != "" {
+			parts := strings.Fields(raw)
+			if len(parts) > 0 {
+				trigger := parts[0]
+				remainderStart := len(trigger)
+				remainder := strings.TrimSpace(raw[remainderStart:])
+				// Locate matching command by trigger
+				var match commands.Command
+				for _, c := range m.app.Commands {
+					if c.MatchesTrigger(trigger) {
+						match = c
+						break
+					}
+				}
+				if match.Name == commands.SessionCompactCommand {
+					// Execute compaction command and optionally send remainder as a normal prompt
+					var teaCmds []tea.Cmd
+					// Clear current editor before executing
+					updated, clearCmd := m.Clear()
+					m = updated.(*editorComponent)
+					teaCmds = append(teaCmds, clearCmd)
+					// Execute compaction with optional extra instruction
+					teaCmds = append(teaCmds, func() tea.Msg {
+						m.app.CompactSession(context.Background(), remainder)
+						return nil
+					})
+					return m, tea.Batch(teaCmds...)
+				}
+			}
+		}
+	}
+
+	// value already trimmed earlier
 	if value == "" {
 		return m, nil
 	}
