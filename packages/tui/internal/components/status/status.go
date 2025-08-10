@@ -220,16 +220,18 @@ func (m *statusComponent) initWatcher() error {
 		return err
 	}
 
-	if err := watcher.Add(headFile); err != nil {
+	// Watch the entire .git directory instead of just HEAD so that atomic
+	// rewrites of HEAD or refs are always detected across platforms.
+	if err := watcher.Add(gitDir); err != nil {
 		watcher.Close()
 		return err
 	}
 
-	// Also watch the ref file if HEAD points to a ref
-	refFile := getGitRefFile(m.app.Info.Path.Cwd)
+	// Also watch the current ref file (in case of direct hash vs ref switches)
+	refFile := getGitRefFile(m.app.Info.Path.Root)
 	if refFile != headFile && refFile != "" {
 		if _, err := os.Stat(refFile); err == nil {
-			watcher.Add(refFile) // Ignore error, HEAD watching is sufficient
+			_ = watcher.Add(refFile) // ignore error: directory watch usually sufficient
 		}
 	}
 
@@ -247,24 +249,30 @@ func (m *statusComponent) watchForGitChanges() tea.Cmd {
 		for {
 			select {
 			case event, ok := <-m.watcher.Events:
-				branch := getCurrentGitBranch(m.app.Info.Path.Root)
 				if !ok {
-					return GitBranchUpdatedMsg{Branch: branch}
+					return GitBranchUpdatedMsg{Branch: getCurrentGitBranch(m.app.Info.Path.Root)}
 				}
-				if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
-					// Debounce updates to prevent excessive refreshes
-					now := time.Now()
-					if now.Sub(m.lastUpdate) < 100*time.Millisecond {
-						continue
+				if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) || event.Has(fsnotify.Rename) {
+					// Small delay to allow git to finish updating refs
+					time.Sleep(60 * time.Millisecond)
+					// Drain any burst of subsequent events without extra sleeps
+				DrainLoop:
+					for {
+						select {
+						case e := <-m.watcher.Events:
+							_ = e // ignore, we just want to collapse bursts
+							continue
+						case <-time.After(5 * time.Millisecond):
+							break DrainLoop
+						}
 					}
-					m.lastUpdate = now
 					if strings.HasSuffix(event.Name, "HEAD") {
 						m.updateWatchedFiles()
 					}
-					return GitBranchUpdatedMsg{Branch: branch}
+					return GitBranchUpdatedMsg{Branch: getCurrentGitBranch(m.app.Info.Path.Root)}
 				}
 			case <-m.watcher.Errors:
-				// Continue watching even on errors
+				// ignore errors, keep watching
 			case <-m.done:
 				return GitBranchUpdatedMsg{Branch: ""}
 			}
@@ -326,7 +334,7 @@ func (m *statusComponent) Cleanup() {
 func NewStatusCmp(app *app.App) StatusComponent {
 	statusComponent := &statusComponent{
 		app:        app,
-		lastUpdate: time.Now(),
+		lastUpdate: time.Time{},
 	}
 
 	homePath, err := os.UserHomeDir()
