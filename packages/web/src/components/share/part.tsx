@@ -148,11 +148,7 @@ export function Part(props: PartProps) {
                   DateTime.DATETIME_MED,
                 )}
                 {` | ${props.message.modelID}`}
-                {props.message.mode && (
-                  <span style={{ "font-weight": "bold", color: "var(--sl-color-accent)" }}>
-                    {` | ${props.message.mode}`}
-                  </span>
-                )}
+                {` | ${props.message.mode}`}
               </Footer>
             )}
           </div>
@@ -171,11 +167,7 @@ export function Part(props: PartProps) {
                 DateTime.DATETIME_MED,
               )}
               {` | ${props.message.modelID}`}
-              {props.message.mode && (
-                <span style={{ "font-weight": "bold", color: "var(--sl-color-accent)" }}>
-                  {` | ${props.message.mode}`}
-                </span>
-              )}
+              {` | ${props.message.mode}`}
             </div>
           </div>
         )}
