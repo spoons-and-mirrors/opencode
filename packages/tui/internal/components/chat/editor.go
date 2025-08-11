@@ -47,20 +47,24 @@ type EditorComponent interface {
 	SetValueWithAttachments(value string)
 	SetInterruptKeyInDebounce(inDebounce bool)
 	SetExitKeyInDebounce(inDebounce bool)
+	SetPauseResumeKeyInDebounce(inDebounce bool)
+	SetPaused(paused bool)
 	RestoreFromHistory(index int)
 }
 
 type editorComponent struct {
-	app                    *app.App
-	width                  int
-	textarea               textarea.Model
-	spinner                spinner.Model
-	interruptKeyInDebounce bool
-	exitKeyInDebounce      bool
-	historyIndex           int    // -1 means current (not in history)
-	currentText            string // Store current text when navigating history
-	pasteCounter           int
-	reverted               bool
+	app                      *app.App
+	width                    int
+	textarea                 textarea.Model
+	spinner                  spinner.Model
+	interruptKeyInDebounce   bool
+	exitKeyInDebounce        bool
+	pauseResumeKeyInDebounce bool
+	paused                   bool   // Local pause state for UI display
+	historyIndex             int    // -1 means current (not in history)
+	currentText              string // Store current text when navigating history
+	pasteCounter             int
+	reverted                 bool
 }
 
 func (m *editorComponent) Init() tea.Cmd {
@@ -374,12 +378,18 @@ func (m *editorComponent) Content() string {
 	if m.exitKeyInDebounce {
 		keyText := m.getExitKeyText()
 		hint = base(keyText+" again") + muted(" to exit")
+	} else if m.pauseResumeKeyInDebounce {
+		// ESC pressed, showing pause/resume options
+		hint = base("esc again") + muted(" to abort | ") + base("f4") + muted(" to pause/resume")
 	} else if m.app.IsBusy() {
 		keyText := m.getInterruptKeyText()
 		status := "working"
-		if m.app.CurrentPermission.ID != "" {
+		if m.paused {
+			status = "paused"
+		} else if m.app.CurrentPermission.ID != "" {
 			status = "waiting for permission"
 		}
+
 		if m.interruptKeyInDebounce && m.app.CurrentPermission.ID == "" {
 			hint = muted(
 				status,
@@ -390,6 +400,9 @@ func (m *editorComponent) Content() string {
 			) + muted(
 				" interrupt",
 			)
+		} else if m.paused {
+			// When paused, show "paused..." with spinner and "esc interrupt | esc+f4 resume"
+			hint = muted(status) + m.spinner.View() + muted("  ") + base(keyText) + muted(" interrupt | ") + base("esc+f4") + muted(" resume")
 		} else {
 			hint = muted(status) + m.spinner.View()
 			if m.app.CurrentPermission.ID == "" {
@@ -561,6 +574,14 @@ func (m *editorComponent) SetInterruptKeyInDebounce(inDebounce bool) {
 	m.interruptKeyInDebounce = inDebounce
 }
 
+func (m *editorComponent) SetPauseResumeKeyInDebounce(inDebounce bool) {
+	m.pauseResumeKeyInDebounce = inDebounce
+}
+
+func (m *editorComponent) SetPaused(paused bool) {
+	m.paused = paused
+}
+
 func (m *editorComponent) SetValue(value string) {
 	m.textarea.SetValue(value)
 }
@@ -718,12 +739,15 @@ func NewEditorComponent(app *app.App) EditorComponent {
 	ta = updateTextareaStyles(ta)
 
 	m := &editorComponent{
-		app:                    app,
-		textarea:               ta,
-		spinner:                s,
-		interruptKeyInDebounce: false,
-		historyIndex:           -1,
-		pasteCounter:           0,
+		app:                      app,
+		textarea:                 ta,
+		spinner:                  s,
+		interruptKeyInDebounce:   false,
+		exitKeyInDebounce:        false,
+		pauseResumeKeyInDebounce: false,
+		paused:                   false,
+		historyIndex:             -1,
+		pasteCounter:             0,
 	}
 
 	return m

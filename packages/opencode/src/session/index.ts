@@ -147,6 +147,17 @@ export namespace Session {
           callback: (input: { info: MessageV2.Assistant; parts: MessageV2.Part[] }) => void
         }[]
       >()
+      const paused = new Map<string, boolean>()
+      const deferredToolCalls = new Map<
+        string,
+        {
+          toolId: string
+          args: any
+          options: any
+          resolve: (value: any) => void
+          reject: (error: any) => void
+        }[]
+      >()
 
       return {
         sessions,
@@ -154,6 +165,8 @@ export namespace Session {
         pending,
         autoCompacting,
         queued,
+        paused,
+        deferredToolCalls,
       }
     },
     async (state) => {
@@ -317,6 +330,39 @@ export namespace Session {
     controller.abort()
     state().pending.delete(sessionID)
     return true
+  }
+
+  export function pause(sessionID: string) {
+    log.info("pausing session", {
+      sessionID,
+    })
+    state().paused.set(sessionID, true)
+    return true
+  }
+
+  export function resume(sessionID: string) {
+    log.info("resuming session", {
+      sessionID,
+    })
+    state().paused.delete(sessionID)
+    const deferredList = state().deferredToolCalls.get(sessionID)
+    if (deferredList && deferredList.length > 0) {
+      state().deferredToolCalls.delete(sessionID)
+      log.info("executing deferred tool calls", {
+        sessionID,
+        count: deferredList.length,
+        toolIds: deferredList.map((d) => d.toolId),
+      })
+      // Execute all deferred tool calls
+      for (const deferred of deferredList) {
+        deferred.resolve(deferred)
+      }
+    }
+    return true
+  }
+
+  export function isPaused(sessionID: string) {
+    return state().paused.has(sessionID)
   }
 
   export async function remove(sessionID: string, emitEvent = true) {
@@ -785,6 +831,77 @@ export namespace Session {
         description: item.description,
         inputSchema: item.parameters as ZodSchema,
         async execute(args, options) {
+          // Check if session is paused before executing
+          if (state().paused.has(input.sessionID)) {
+            log.info("deferring tool call due to paused session", {
+              sessionID: input.sessionID,
+              toolId: item.id,
+              callID: options.toolCallId,
+            })
+            // Defer this tool call
+            return new Promise((resolve, reject) => {
+              const sessionID = input.sessionID
+              const existing = state().deferredToolCalls.get(sessionID) || []
+              existing.push({
+                toolId: item.id,
+                args,
+                options,
+                resolve: async () => {
+                  try {
+                    await Plugin.trigger(
+                      "tool.execute.before",
+                      {
+                        tool: item.id,
+                        sessionID: input.sessionID,
+                        callID: options.toolCallId,
+                      },
+                      {
+                        args,
+                      },
+                    )
+                    const result = await item.execute(args, {
+                      sessionID: input.sessionID,
+                      abort: options.abortSignal!,
+                      messageID: assistantMsg.id,
+                      callID: options.toolCallId,
+                      metadata: async (val) => {
+                        const match = processor.partFromToolCall(options.toolCallId)
+                        if (match && match.state.status === "running") {
+                          await updatePart({
+                            ...match,
+                            state: {
+                              title: val.title,
+                              metadata: val.metadata,
+                              status: "running",
+                              input: args,
+                              time: {
+                                start: Date.now(),
+                              },
+                            },
+                          })
+                        }
+                      },
+                    })
+                    await Plugin.trigger(
+                      "tool.execute.after",
+                      {
+                        tool: item.id,
+                        sessionID: input.sessionID,
+                        callID: options.toolCallId,
+                      },
+                      result,
+                    )
+                    resolve(result)
+                  } catch (error) {
+                    reject(error)
+                  }
+                },
+                reject,
+              })
+              state().deferredToolCalls.set(sessionID, existing)
+            })
+          }
+
           await Plugin.trigger(
             "tool.execute.before",
             {

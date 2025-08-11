@@ -120,6 +120,9 @@ resources:
       delete: delete /session/{id}
       init: post /session/{id}/init
       abort: post /session/{id}/abort
+      pause: post /session/{id}/pause
+      resume: post /session/{id}/resume
+      status: get /session/{id}/status
       share: post /session/{id}/share
       unshare: delete /session/{id}/share
       summarize: post /session/{id}/summarize

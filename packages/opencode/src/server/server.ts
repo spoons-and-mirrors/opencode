@@ -440,6 +440,91 @@ export namespace Server {
         },
       )
       .post(
+        "/session/:id/pause",
+        describeRoute({
+          description: "Pause a session at the next tool call",
+          operationId: "session.pause",
+          responses: {
+            200: {
+              description: "Successfully paused session",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        async (c) => {
+          return c.json(Session.pause(c.req.valid("param").id))
+        },
+      )
+      .post(
+        "/session/:id/resume",
+        describeRoute({
+          description: "Resume a paused session",
+          operationId: "session.resume",
+          responses: {
+            200: {
+              description: "Successfully resumed session",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        async (c) => {
+          return c.json(Session.resume(c.req.valid("param").id))
+        },
+      )
+      .get(
+        "/session/:id/status",
+        describeRoute({
+          description: "Get session status including pause state",
+          operationId: "session.status",
+          responses: {
+            200: {
+              description: "Session status",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      paused: z.boolean(),
+                    }),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        async (c) => {
+          const sessionID = c.req.valid("param").id
+          return c.json({
+            paused: Session.isPaused(sessionID),
+          })
+        },
+      )
+      .post(
         "/session/:id/share",
         describeRoute({
           description: "Share a session",

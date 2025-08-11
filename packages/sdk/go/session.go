@@ -90,6 +90,42 @@ func (r *SessionService) Abort(ctx context.Context, id string, opts ...option.Re
 	return
 }
 
+// Pause a session at the next tool call
+func (r *SessionService) Pause(ctx context.Context, id string, opts ...option.RequestOption) (res *bool, err error) {
+	opts = append(r.Options[:], opts...)
+	if id == "" {
+		err = errors.New("missing required id parameter")
+		return
+	}
+	path := fmt.Sprintf("session/%s/pause", id)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
+	return
+}
+
+// Resume a paused session
+func (r *SessionService) Resume(ctx context.Context, id string, opts ...option.RequestOption) (res *bool, err error) {
+	opts = append(r.Options[:], opts...)
+	if id == "" {
+		err = errors.New("missing required id parameter")
+		return
+	}
+	path := fmt.Sprintf("session/%s/resume", id)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
+	return
+}
+
+// Get session status including pause state
+func (r *SessionService) Status(ctx context.Context, id string, opts ...option.RequestOption) (res *SessionStatus, err error) {
+	opts = append(r.Options[:], opts...)
+	if id == "" {
+		err = errors.New("missing required id parameter")
+		return
+	}
+	path := fmt.Sprintf("session/%s/status", id)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &res, opts...)
+	return
+}
+
 // Create and send a new message to a session
 func (r *SessionService) Chat(ctx context.Context, id string, body SessionChatParams, opts ...option.RequestOption) (res *AssistantMessage, err error) {
 	opts = append(r.Options[:], opts...)
@@ -2431,4 +2467,24 @@ type SessionSummarizeParams struct {
 
 func (r SessionSummarizeParams) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
+}
+
+type SessionStatus struct {
+	Paused bool              `json:"paused,required"`
+	JSON   sessionStatusJSON `json:"-"`
+}
+
+// sessionStatusJSON contains the JSON metadata for the struct [SessionStatus]
+type sessionStatusJSON struct {
+	Paused      apijson.Field
+	raw         string
+	ExtraFields map[string]apijson.Field
+}
+
+func (r *SessionStatus) UnmarshalJSON(data []byte) (err error) {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func (r sessionStatusJSON) RawJSON() string {
+	return r.raw
 }

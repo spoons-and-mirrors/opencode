@@ -38,11 +38,17 @@ type InterruptDebounceTimeoutMsg struct{}
 // ExitDebounceTimeoutMsg is sent when the exit key debounce timeout expires
 type ExitDebounceTimeoutMsg struct{}
 
+// PauseResumeTimeoutMsg is sent when the pause/resume key combination timeout expires
+type PauseResumeTimeoutMsg struct{}
+
 // InterruptKeyState tracks the state of interrupt key presses for debouncing
 type InterruptKeyState int
 
 // ExitKeyState tracks the state of exit key presses for debouncing
 type ExitKeyState int
+
+// PauseResumeKeyState tracks the state of pause/resume key sequence
+type PauseResumeKeyState int
 
 const (
 	InterruptKeyIdle InterruptKeyState = iota
@@ -54,8 +60,14 @@ const (
 	ExitKeyFirstPress
 )
 
+const (
+	PauseResumeKeyIdle PauseResumeKeyState = iota
+	PauseResumeKeyAwaitingF4
+)
+
 const interruptDebounceTimeout = 1 * time.Second
 const exitDebounceTimeout = 1 * time.Second
+const pauseResumeTimeout = 1 * time.Second
 
 type Model struct {
 	tea.Model
@@ -76,6 +88,7 @@ type Model struct {
 	toastManager         *toast.ToastManager
 	interruptKeyState    InterruptKeyState
 	exitKeyState         ExitKeyState
+	pauseResumeKeyState  PauseResumeKeyState
 	messagesRight        bool
 }
 
@@ -280,9 +293,35 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, util.CmdHandler(commands.ExecuteCommandMsg(inputClearCommand))
 		}
 
-		// 7. Handle interrupt key debounce for session interrupt
+		// 7. Handle pause/resume key sequence for ESC
+		if keyString == "esc" {
+			// Check if we're awaiting F4 for pause/resume
+			if a.pauseResumeKeyState == PauseResumeKeyAwaitingF4 {
+				// Second ESC cancels the sequence, treat as normal ESC interrupt
+				a.pauseResumeKeyState = PauseResumeKeyIdle
+				a.editor.SetPauseResumeKeyInDebounce(false)
+				// Fall through to normal ESC handling below
+			} else {
+				// First ESC - start pause/resume sequence detection
+				a.pauseResumeKeyState = PauseResumeKeyAwaitingF4
+				a.editor.SetPauseResumeKeyInDebounce(true)
+				return a, tea.Tick(pauseResumeTimeout, func(t time.Time) tea.Msg {
+					return PauseResumeTimeoutMsg{}
+				})
+			}
+		}
+
+		if keyString == "f4" && a.pauseResumeKeyState == PauseResumeKeyAwaitingF4 {
+			// ESC+F4 combination detected
+			a.pauseResumeKeyState = PauseResumeKeyIdle
+			a.editor.SetPauseResumeKeyInDebounce(false)
+
+			// For now, just trigger pause - the backend will handle the smart logic
+			pauseCommand := a.app.Commands[commands.SessionPauseCommand]
+			return a, util.CmdHandler(commands.ExecuteCommandMsg(pauseCommand))
+		} // 8. Handle interrupt key debounce for session interrupt
 		interruptCommand := a.app.Commands[commands.SessionInterruptCommand]
-		if interruptCommand.Matches(msg, a.app.IsLeaderSequence) && a.app.IsBusy() {
+		if interruptCommand.Matches(msg, a.app.IsLeaderSequence) && a.app.IsBusy() && a.pauseResumeKeyState == PauseResumeKeyIdle {
 			switch a.interruptKeyState {
 			case InterruptKeyIdle:
 				// First interrupt key press - start debounce timer
@@ -700,6 +739,11 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reset exit key state after timeout
 		a.exitKeyState = ExitKeyIdle
 		a.editor.SetExitKeyInDebounce(false)
+	case PauseResumeTimeoutMsg:
+		// Reset pause/resume key state after timeout
+		a.pauseResumeKeyState = PauseResumeKeyIdle
+		a.editor.SetPauseResumeKeyInDebounce(false)
+
 	case tea.PasteMsg, tea.ClipboardMsg:
 		// Paste events: prioritize modal if active, otherwise editor
 		if a.modal != nil {
@@ -1176,6 +1220,47 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		}
 		a.app.Cancel(context.Background(), a.app.Session.ID)
 		return a, nil
+	case commands.SessionPauseCommand:
+		if a.app.Session.ID == "" {
+			return a, nil
+		}
+
+		// Check session status first to determine if we should pause or resume
+		status, err := a.app.Client.Session.Status(context.Background(), a.app.Session.ID)
+		if err != nil {
+			slog.Error("Failed to get session status", "error", err)
+			return a, toast.NewErrorToast("Failed to get session status")
+		}
+
+		if status.Paused {
+			// Session is paused, so resume it
+			_, err := a.app.Client.Session.Resume(context.Background(), a.app.Session.ID)
+			if err != nil {
+				slog.Error("Failed to resume session", "error", err)
+				return a, toast.NewErrorToast("Failed to resume session")
+			}
+			a.editor.SetPaused(false)
+			return a, toast.NewWarningToast("Session resumed")
+		} else {
+			// Session is running, so pause it
+			_, err := a.app.Client.Session.Pause(context.Background(), a.app.Session.ID)
+			if err != nil {
+				slog.Error("Failed to pause session", "error", err)
+				return a, toast.NewErrorToast("Failed to pause session")
+			}
+			a.editor.SetPaused(true)
+			return a, toast.NewWarningToast("Session paused | ESC+F4 to resume")
+		}
+	case commands.SessionResumeCommand:
+		if a.app.Session.ID == "" {
+			return a, nil
+		}
+		_, err := a.app.Client.Session.Resume(context.Background(), a.app.Session.ID)
+		if err != nil {
+			slog.Error("Failed to resume session", "error", err)
+			return a, toast.NewErrorToast("Failed to resume session")
+		}
+		return a, toast.NewSuccessToast("Session resumed")
 	case commands.SessionCompactCommand:
 		if a.app.Session.ID == "" {
 			return a, nil
@@ -1476,6 +1561,7 @@ func NewModel(app *app.App) tea.Model {
 		toastManager:         toast.NewToastManager(),
 		interruptKeyState:    InterruptKeyIdle,
 		exitKeyState:         ExitKeyIdle,
+		pauseResumeKeyState:  PauseResumeKeyIdle,
 	}
 
 	return model
