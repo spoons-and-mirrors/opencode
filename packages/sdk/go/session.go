@@ -2298,10 +2298,6 @@ func (r sessionMessagesResponseJSON) RawJSON() string {
 	return r.raw
 }
 
-type SessionUpdateParams struct {
-	Title param.Field[string] `json:"title"`
-}
-
 func (r SessionUpdateParams) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
 }
@@ -2397,3 +2393,9 @@ type SessionSummarizeParams struct {
 func (r SessionSummarizeParams) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
 }
+
+type SessionUpdateParams struct {
+	Title param.Field[string] `json:"title"`
+}
+
+
