@@ -154,11 +154,6 @@ func (s *sessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.modal.SetTitle("Switch Session")
 				s.updateListItems()
 				return s, nil
-			case "esc":
-				s.renameMode = false
-				s.modal.SetTitle("Switch Session")
-				s.updateListItems()
-				return s, nil
 			default:
 				var cmd tea.Cmd
 				s.renameInput, cmd = s.renameInput.Update(msg)
