@@ -49,7 +49,7 @@ func (cg *agentsContextGroup) GetChildEntries(
 			continue
 		}
 		// Check if agent is disabled by effective overrides for the current agent
-		currentAgentOverrides := cg.app.GetEffectiveAgentOverrides(cg.app.Agent().Name)
+		currentAgentOverrides := cg.app.GetSessionSubagentOverrides(cg.app.Agent().Name)
 		if enabled, exists := currentAgentOverrides[agent.Name]; exists && !enabled {
 			continue
 		}

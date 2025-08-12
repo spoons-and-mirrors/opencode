@@ -257,12 +257,13 @@ func (d *resourceDialog) setupToolResources(ctx context.Context, agent *opencode
 		}...)
 	} else {
 
-		toolOverrides := d.app.GetEffectiveToolOverrides(agent.Name)
+		toolOverrides := d.app.GetSessionToolOverrides(agent.Name)
 
 		// Build tool items with current state
 		toolKeys := make([]string, 0, len(availableTools))
 		for k, toolInfo := range availableTools {
-			if toolInfo.DefaultEnabled == nil || *toolInfo.DefaultEnabled {
+			// Filter out the "Invalid" tool and only include enabled tools
+			if k != "invalid" && (toolInfo.DefaultEnabled == nil || *toolInfo.DefaultEnabled) {
 				toolKeys = append(toolKeys, k)
 			}
 		}
@@ -270,7 +271,7 @@ func (d *resourceDialog) setupToolResources(ctx context.Context, agent *opencode
 
 		for _, toolName := range toolKeys {
 			toolInfo := availableTools[toolName]
-			defaultEnabled := app.IsResourceDefaultEnabled(toolInfo)
+			defaultEnabled := IsToolDefaultEnabled(toolInfo)
 			if agentSetting, exists := agent.Tools[toolName]; exists {
 				defaultEnabled = agentSetting
 			}
@@ -295,22 +296,22 @@ func (d *resourceDialog) setupToolResources(ctx context.Context, agent *opencode
 		}...)
 	} else {
 
-		agentOverrides := d.app.GetEffectiveAgentOverrides(agent.Name)
+		agentOverrides := d.app.GetSessionSubagentOverrides(agent.Name)
 
 		// Add subagents as toggles
-		for name, agentInfo := range availableAgents {
-			if agentInfo.Source == "primary" {
+		for _, agentInfo := range availableAgents {
+			if agentInfo.Mode == "primary" {
 				continue // Skip primary agents
 			}
 
 			defaultEnabled := true // subagents are enabled by default
 			enabled := defaultEnabled
-			if override, exists := agentOverrides[name]; exists {
+			if override, exists := agentOverrides[agentInfo.Name]; exists {
 				enabled = override
 			}
 
 			d.allResources = append(d.allResources, NewAgentToggleResourceItem(
-				name, agentInfo.Source, enabled, defaultEnabled,
+				agentInfo.Name, agentInfo.Mode, enabled, defaultEnabled,
 			))
 		}
 	}
@@ -340,13 +341,13 @@ func (d *resourceDialog) setupAgentResources(ctx context.Context, agent *opencod
 	d.allResources = make([]ResourceItem, 0)
 
 	// For agent dialog, show selection mode (not toggle mode)
-	for name, agentInfo := range availableAgents {
-		if agentInfo.Source == "primary" {
+	for _, agentInfo := range availableAgents {
+		if agentInfo.Mode == "primary" {
 			continue // Skip primary agents in selection
 		}
 
 		d.allResources = append(d.allResources, NewAgentResourceItem(
-			name, agentInfo.Description, agentInfo.Source, false, // false = selection mode
+			agentInfo.Name, agentInfo.Description, agentInfo.Mode, false, // false = selection mode
 		))
 	}
 }

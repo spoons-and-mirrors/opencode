@@ -94,9 +94,9 @@ export namespace ToolRegistry {
     return result
   }
 
-  export async function getResourceInfo(): Promise<Record<string, any>> {
+  export async function getToolInfo(): Promise<Record<string, any>> {
     const result: Record<string, any> = {}
-    // Create a default agent info for resource listing - use permissive defaults
+    // Create a default agent info for tool listing - use permissive defaults
     const defaultAgent: Agent.Info = {
       name: "default",
       mode: "primary",
@@ -115,7 +115,6 @@ export namespace ToolRegistry {
       result[toolId] = {
         name: toolId,
         description: (await tool.init()).description || "",
-        type: "tool",
         source: "builtin",
         defaultEnabled: enabled[toolId] !== false,
       }
