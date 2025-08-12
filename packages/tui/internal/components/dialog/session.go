@@ -47,7 +47,7 @@ func (s sessionItem) Render(
 	} else {
 		prefix := ""
 		if s.isPinned {
-			prefix = "📌 "
+			prefix = styles.NewStyle().Foreground(t.Success()).Render("● ")
 		}
 		if s.isCurrentSession {
 			text = prefix + "● " + s.title

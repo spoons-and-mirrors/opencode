@@ -845,6 +845,16 @@ func (a *App) PinSession(ctx context.Context, sessionID string, pinned bool) err
 	return nil
 }
 
+func (a *App) TouchSession(ctx context.Context, sessionID string) error {
+	// Update session without changing any fields - this will update the timestamp
+	_, err := a.Client.Session.Update(ctx, sessionID, opencode.SessionUpdateParams{})
+	if err != nil {
+		slog.Error("Failed to touch session", "error", err)
+		return err
+	}
+	return nil
+}
+
 func (a *App) ListMessages(ctx context.Context, sessionId string) ([]Message, error) {
 	response, err := a.Client.Session.Messages(ctx, sessionId)
 	if err != nil {

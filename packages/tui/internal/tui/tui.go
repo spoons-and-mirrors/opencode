@@ -613,7 +613,19 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.app.Session = msg
 		a.app.Messages = messages
-		return a, util.CmdHandler(app.SessionLoadedMsg{})
+
+		// Touch the session to update its timestamp and move it to top of list
+		return a, tea.Batch(
+			util.CmdHandler(app.SessionLoadedMsg{}),
+			func() tea.Msg {
+				ctx := context.Background()
+				err := a.app.TouchSession(ctx, msg.ID)
+				if err != nil {
+					slog.Error("Failed to touch session", "error", err.Error())
+				}
+				return nil
+			},
+		)
 	case app.SessionCreatedMsg:
 		a.app.Session = msg.Session
 		return a, util.CmdHandler(app.SessionLoadedMsg{})

@@ -244,12 +244,18 @@ export namespace Session {
     await Share.remove(id, share.secret)
   }
 
-  export async function update(id: string, editor: (session: Info) => void) {
+  export async function update(
+    id: string,
+    editor: (session: Info) => void,
+    options: { skipTimeUpdate?: boolean } = {},
+  ) {
     const { sessions } = state()
     const session = await get(id)
     if (!session) return
     editor(session)
-    session.time.updated = Date.now()
+    if (!options.skipTimeUpdate) {
+      session.time.updated = Date.now()
+    }
     sessions.set(id, session)
     await Storage.writeJSON("session/info/" + id, session)
     Bus.publish(Event.Updated, {

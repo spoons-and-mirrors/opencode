@@ -330,14 +330,21 @@ export namespace Server {
           const sessionID = c.req.valid("param").id
           const updates = c.req.valid("json")
 
-          const updatedSession = await Session.update(sessionID, (session) => {
-            if (updates.title !== undefined) {
-              session.title = updates.title
-            }
-            if (updates.pinned !== undefined) {
-              session.pinned = updates.pinned
-            }
-          })
+          // Check if only pinned field is being updated
+          const onlyPinnedUpdate = updates.title === undefined && updates.pinned !== undefined
+
+          const updatedSession = await Session.update(
+            sessionID,
+            (session) => {
+              if (updates.title !== undefined) {
+                session.title = updates.title
+              }
+              if (updates.pinned !== undefined) {
+                session.pinned = updates.pinned
+              }
+            },
+            { skipTimeUpdate: onlyPinnedUpdate },
+          )
 
           return c.json(updatedSession)
         },
