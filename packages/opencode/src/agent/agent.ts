@@ -140,23 +140,6 @@ export namespace Agent {
     return state().then((x) => Object.values(x))
   }
 
-  export async function getResourceInfo(): Promise<Record<string, any>> {
-    const agents = await list()
-    const result: Record<string, any> = {}
-
-    for (const agent of agents) {
-      result[agent.name] = {
-        name: agent.name,
-        description: agent.description || "",
-        type: "agent",
-        source: agent.mode,
-        defaultEnabled: true,
-      }
-    }
-
-    return result
-  }
-
   export async function generate(input: { description: string }) {
     const defaultModel = await Provider.defaultModel()
     const model = await Provider.getModel(defaultModel.providerID, defaultModel.modelID)

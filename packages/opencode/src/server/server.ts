@@ -684,6 +684,79 @@ export namespace Server {
         },
       )
       .get(
+        "/session/:id/overrides",
+        describeRoute({
+          description: "Get session overrides for all agents (tools and subagents)",
+          operationId: "session.getAllOverrides",
+          responses: {
+            200: {
+              description: "Overrides for all agents in the session",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.record(
+                      z.string(),
+                      z.object({
+                        tools: z.record(z.string(), z.boolean()).default({}),
+                        agents: z.record(z.string(), z.boolean()).default({}),
+                      }),
+                    ),
+                  ),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        async (c) => {
+          const { id: sessionID } = c.req.valid("param")
+          const allOverrides = Session.getAllOverrides(sessionID)
+          return c.json(allOverrides)
+        },
+      )
+      .put(
+        "/session/:id/:agent/overrides",
+        describeRoute({
+          description: "Set session overrides for a specific agent (tools and subagents)",
+          operationId: "session.setOverrides",
+          responses: {
+            200: {
+              description: "Overrides updated successfully",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+            agent: z.string(),
+          }),
+        ),
+        zValidator(
+          "json",
+          z.object({
+            tools: z.record(z.string(), z.boolean()).optional(),
+            agents: z.record(z.string(), z.boolean()).optional(),
+          }),
+        ),
+        async (c) => {
+          const { id: sessionID, agent } = c.req.valid("param")
+          const { tools, agents } = c.req.valid("json")
+          await Session.setOverrides(sessionID, agent, { tools, agents })
+          return c.json(true)
+        },
+      )
+      .get(
         "/config/providers",
         describeRoute({
           description: "List all providers",
@@ -936,13 +1009,13 @@ export namespace Server {
         },
       )
       .get(
-        "/app/resources/:type",
+        "/app/tools",
         describeRoute({
-          description: "List all available resources (tools or agents)",
-          operationId: "app.resources",
+          description: "List all available tools",
+          operationId: "app.tools",
           responses: {
             200: {
-              description: "List of resources",
+              description: "List of tools",
               content: {
                 "application/json": {
                   schema: resolver(
@@ -951,8 +1024,7 @@ export namespace Server {
                       z.object({
                         name: z.string(),
                         description: z.string().optional(),
-                        type: z.enum(["tool", "agent"]),
-                        source: z.string(),
+                        source: z.enum(["builtin", "mcp"]),
                         defaultEnabled: z.boolean().optional().default(true),
                       }),
                     ),
@@ -963,18 +1035,9 @@ export namespace Server {
           },
         }),
         async (c) => {
-          const type = c.req.param("type") as "tool" | "agent"
-          if (type !== "tool" && type !== "agent") {
-            return c.json({ error: "Invalid resource type. Must be 'tool' or 'agent'" }, 400)
-          }
-
-          if (type === "tool") {
-            const builtin = await ToolRegistry.getResourceInfo()
-            const mcp = await MCP.getResourceInfo()
-            return c.json({ ...builtin, ...mcp })
-          } else {
-            return c.json(await Agent.getResourceInfo())
-          }
+          const builtin = await ToolRegistry.getToolInfo()
+          const mcp = await MCP.getToolInfo()
+          return c.json({ ...builtin, ...mcp })
         },
       )
       .post(

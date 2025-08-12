@@ -144,7 +144,8 @@ export namespace Session {
           callback: (input: { info: MessageV2.Assistant; parts: MessageV2.Part[] }) => void
         }[]
       >()
-      const agentOverrides = new Map<string, Record<string, Record<string, boolean>>>()
+      const subagentOverrides = new Map<string, Record<string, Record<string, boolean>>>()
+      const toolOverrides = new Map<string, Record<string, Record<string, boolean>>>()
 
       return {
         sessions,
@@ -152,7 +153,8 @@ export namespace Session {
         pending,
         autoCompacting,
         queued,
-        agentOverrides,
+        subagentOverrides,
+        toolOverrides,
       }
     },
     async (state) => {
@@ -162,23 +164,67 @@ export namespace Session {
     },
   )
 
-  export function setAgentOverrides(sessionID: string, agentName: string, overrides: Record<string, boolean>) {
-    const sessionOverrides = state().agentOverrides.get(sessionID) ?? {}
-    sessionOverrides[agentName] = overrides
-    state().agentOverrides.set(sessionID, sessionOverrides)
+  type OverridesMap = Record<string, Record<string, boolean>>
+  type Overrides = { tools: Record<string, boolean>; agents: Record<string, boolean> }
+
+  async function persistOverrides(sessionID: string) {
+    const tools = state().toolOverrides.get(sessionID) ?? {}
+    const agents = state().subagentOverrides.get(sessionID) ?? {}
+    await Storage.writeJSON("session/overrides/" + sessionID, { tools, agents })
   }
 
-  export function getAgentOverrides(sessionID: string, agentName?: string): Record<string, boolean> {
-    const sessionOverrides = state().agentOverrides.get(sessionID) ?? {}
-    if (agentName) {
-      return sessionOverrides[agentName] ?? {}
+  export async function setOverrides(sessionID: string, agentName: string, input: Partial<Overrides>) {
+    if (input.tools) {
+      const tools: OverridesMap = state().toolOverrides.get(sessionID) ?? {}
+      tools[agentName] = input.tools
+      state().toolOverrides.set(sessionID, tools)
     }
-    // Return all overrides for all agents if no agentName specified
-    const allOverrides: Record<string, boolean> = {}
-    for (const [_, overrides] of Object.entries(sessionOverrides)) {
-      Object.assign(allOverrides, overrides)
+    if (input.agents) {
+      const agents: OverridesMap = state().subagentOverrides.get(sessionID) ?? {}
+      agents[agentName] = input.agents
+      state().subagentOverrides.set(sessionID, agents)
     }
-    return allOverrides
+    await persistOverrides(sessionID)
+  }
+
+  export function getOverrides(sessionID: string, agentName: string): Overrides {
+    const toolsAll = state().toolOverrides.get(sessionID) ?? {}
+    const agentsAll = state().subagentOverrides.get(sessionID) ?? {}
+    return {
+      tools: toolsAll[agentName] ?? {},
+      agents: agentsAll[agentName] ?? {},
+    }
+  }
+
+  export function getAllOverrides(sessionID: string): Record<string, Overrides> {
+    const toolsAll = state().toolOverrides.get(sessionID) ?? {}
+    const agentsAll = state().subagentOverrides.get(sessionID) ?? {}
+
+    // Get all unique agent names from both tools and agents overrides
+    const allAgentNames = new Set([...Object.keys(toolsAll), ...Object.keys(agentsAll)])
+
+    const result: Record<string, Overrides> = {}
+    for (const agentName of allAgentNames) {
+      result[agentName] = {
+        tools: toolsAll[agentName] ?? {},
+        agents: agentsAll[agentName] ?? {},
+      }
+    }
+
+    return result
+  }
+
+  async function loadOverrides(sessionID: string) {
+    try {
+      const overrides = await Storage.readJSON<{
+        tools?: OverridesMap
+        agents?: OverridesMap
+      }>("session/overrides/" + sessionID)
+      state().subagentOverrides.set(sessionID, overrides.agents ?? {})
+      state().toolOverrides.set(sessionID, overrides.tools ?? {})
+    } catch {
+      // ignore
+    }
   }
 
   export async function create(parentID?: string) {
@@ -219,6 +265,8 @@ export namespace Session {
     }
     const read = await Storage.readJSON<Info>("session/info/" + id)
     state().sessions.set(id, read)
+    // Load overrides (tools and agents) from unified file
+    await loadOverrides(id)
     return read as Info
   }
 
@@ -346,10 +394,12 @@ export namespace Session {
       }
       await unshare(sessionID).catch(() => {})
       await Storage.remove(`session/info/${sessionID}`).catch(() => {})
+      await Storage.remove(`session/overrides/${sessionID}`).catch(() => {})
       await Storage.removeDir(`session/message/${sessionID}/`).catch(() => {})
       state().sessions.delete(sessionID)
       state().messages.delete(sessionID)
-      state().agentOverrides.delete(sessionID)
+      state().subagentOverrides.delete(sessionID)
+      state().toolOverrides.delete(sessionID)
       if (emitEvent) {
         Bus.publish(Event.Deleted, {
           info: session,
@@ -787,15 +837,25 @@ export namespace Session {
 
     const processor = createProcessor(assistantMsg, model.info)
 
+    // Load saved overrides for this session/agent
+    const saved = getOverrides(input.sessionID, input.agent ?? inputAgent)
+    const savedToolOverrides = saved.tools
+
     const enabledTools = pipe(
       agent.tools,
       mergeDeep(await ToolRegistry.enabled(input.providerID, input.modelID, agent)),
+      mergeDeep(savedToolOverrides),
       mergeDeep(input.tools ?? {}),
     )
 
-    // Store agent overrides for tools to access
-    if (input.agents && input.agent) {
-      setAgentOverrides(input.sessionID, input.agent, input.agents)
+    // Store overrides for tools and agents to access, merging with existing ones
+    if (input.agent) {
+      const existing = getOverrides(input.sessionID, input.agent)
+      const next = {
+        tools: input.tools ? { ...existing.tools, ...input.tools } : undefined,
+        agents: input.agents ? { ...existing.agents, ...input.agents } : undefined,
+      }
+      if (next.tools || next.agents) await setOverrides(input.sessionID, input.agent, next)
     }
 
     for (const item of await ToolRegistry.tools(input.providerID, input.modelID)) {
@@ -804,10 +864,14 @@ export namespace Session {
       // Dynamically filter agent descriptions for the task tool based on session overrides
       let description = item.description
       if (item.id === "task") {
-        if (input.agents && Object.keys(input.agents).length > 0) {
+        // Load saved subagent overrides for this session/agent
+        const savedSubagentOverrides = getOverrides(input.sessionID, input.agent ?? inputAgent).agents
+        const effectiveSubagentOverrides = { ...savedSubagentOverrides, ...(input.agents ?? {}) }
+
+        if (effectiveSubagentOverrides && Object.keys(effectiveSubagentOverrides).length > 0) {
           // Get available agents and filter out disabled ones
           const availableAgents = await Agent.list().then((x) =>
-            x.filter((a) => a.mode !== "primary" && input.agents![a.name] !== false),
+            x.filter((a) => a.mode !== "primary" && effectiveSubagentOverrides![a.name] !== false),
           )
           // Rebuild the description with only enabled agents
           const agentList = availableAgents

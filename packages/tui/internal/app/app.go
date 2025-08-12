@@ -66,6 +66,35 @@ type sessionResourceOverrides struct {
 
 var sessionOverrides = make(map[string]*sessionResourceOverrides)
 
+// ClearHomeScreenOverrides clears any stored overrides for the home screen
+func (a *App) ClearHomeScreenOverrides() {
+	delete(sessionOverrides, "")
+}
+
+// TransferHomeScreenOverrides copies overrides from home screen ("" session) to a new session
+func (a *App) TransferHomeScreenOverrides(newSessionID string) {
+	if homeOverrides, exists := sessionOverrides[""]; exists {
+		// Deep copy the overrides structure
+		newOverrides := &sessionResourceOverrides{
+			AgentOverrides: make(map[string]map[string]map[string]bool),
+		}
+		for agent, agentOverrides := range homeOverrides.AgentOverrides {
+			newOverrides.AgentOverrides[agent] = make(map[string]map[string]bool)
+			for overrideType, overrides := range agentOverrides {
+				newAgentOverrides := make(map[string]bool)
+				for k, v := range overrides {
+					newAgentOverrides[k] = v
+				}
+				newOverrides.AgentOverrides[agent][overrideType] = newAgentOverrides
+			}
+		}
+		sessionOverrides[newSessionID] = newOverrides
+
+		// Keep home screen overrides for future sessions
+		// Don't delete them - they should persist for new sessions
+	}
+}
+
 // GetSessionToolOverrides returns tool overrides for the given agent in the current session
 func (a *App) GetSessionToolOverrides(agentName string) map[string]bool {
 	if overrides, exists := sessionOverrides[a.Session.ID]; exists && overrides.AgentOverrides != nil {
@@ -91,8 +120,8 @@ func (a *App) SetSessionToolOverrides(agentName string, overrides map[string]boo
 	sessionOverrides[a.Session.ID].AgentOverrides[agentName]["tool"] = overrides
 }
 
-// GetSessionAgentOverrides returns agent overrides for the given agent in the current session
-func (a *App) GetSessionAgentOverrides(agentName string) map[string]bool {
+// GetSessionSubagentOverrides returns subagent overrides for the given agent in the current session
+func (a *App) GetSessionSubagentOverrides(agentName string) map[string]bool {
 	if overrides, exists := sessionOverrides[a.Session.ID]; exists && overrides.AgentOverrides != nil {
 		if agentMap, exists := overrides.AgentOverrides[agentName]; exists {
 			if subagentOverrides, exists := agentMap["agent"]; exists {
@@ -103,8 +132,8 @@ func (a *App) GetSessionAgentOverrides(agentName string) map[string]bool {
 	return make(map[string]bool)
 }
 
-// SetSessionAgentOverrides sets agent overrides for the given agent in the current session
-func (a *App) SetSessionAgentOverrides(agentName string, overrides map[string]bool) {
+// SetSessionSubagentOverrides sets subagent overrides for the given agent in the current session
+func (a *App) SetSessionSubagentOverrides(agentName string, overrides map[string]bool) {
 	if sessionOverrides[a.Session.ID] == nil {
 		sessionOverrides[a.Session.ID] = &sessionResourceOverrides{
 			AgentOverrides: make(map[string]map[string]map[string]bool),
@@ -116,89 +145,9 @@ func (a *App) SetSessionAgentOverrides(agentName string, overrides map[string]bo
 	sessionOverrides[a.Session.ID].AgentOverrides[agentName]["agent"] = overrides
 }
 
-// GetPersistentToolOverrides returns persistent tool preferences for the given agent
-func (a *App) GetPersistentToolOverrides(agentName string) map[string]bool {
-	if a.State.ToolOverrides == nil {
-		a.State.ToolOverrides = make(map[string]map[string]bool)
-	}
-	if a.State.ToolOverrides[agentName] == nil {
-		return make(map[string]bool)
-	}
-	return a.State.ToolOverrides[agentName]
-}
-
-// SetPersistentToolOverrides sets persistent tool preferences for the given agent
-func (a *App) SetPersistentToolOverrides(agentName string, overrides map[string]bool) {
-	if a.State.ToolOverrides == nil {
-		a.State.ToolOverrides = make(map[string]map[string]bool)
-	}
-	a.State.ToolOverrides[agentName] = overrides
-}
-
-// GetPersistentAgentOverrides returns persistent agent preferences for the given agent
-func (a *App) GetPersistentAgentOverrides(agentName string) map[string]bool {
-	if a.State.AgentOverrides == nil {
-		a.State.AgentOverrides = make(map[string]map[string]bool)
-	}
-	if a.State.AgentOverrides[agentName] == nil {
-		return make(map[string]bool)
-	}
-	return a.State.AgentOverrides[agentName]
-}
-
-// SetPersistentAgentOverrides sets persistent agent preferences for the given agent
-func (a *App) SetPersistentAgentOverrides(agentName string, overrides map[string]bool) {
-	if a.State.AgentOverrides == nil {
-		a.State.AgentOverrides = make(map[string]map[string]bool)
-	}
-	a.State.AgentOverrides[agentName] = overrides
-}
-
 // HasActiveSession returns true if there's an active session
 func (a *App) HasActiveSession() bool {
 	return a.Session != nil && a.Session.ID != ""
-}
-
-// GetEffectiveToolOverrides returns the effective tool overrides for the given agent
-// (persistent preferences merged with session overrides, with session taking priority)
-func (a *App) GetEffectiveToolOverrides(agentName string) map[string]bool {
-	// Start with persistent preferences
-	effective := make(map[string]bool)
-	persistent := a.GetPersistentToolOverrides(agentName)
-	for tool, enabled := range persistent {
-		effective[tool] = enabled
-	}
-
-	// If there's an active session, overlay session overrides
-	if a.HasActiveSession() {
-		sessionOverrides := a.GetSessionToolOverrides(agentName)
-		for tool, enabled := range sessionOverrides {
-			effective[tool] = enabled
-		}
-	}
-
-	return effective
-}
-
-// GetEffectiveAgentOverrides returns the effective agent overrides for the given agent
-// (persistent preferences merged with session overrides, with session taking priority)
-func (a *App) GetEffectiveAgentOverrides(agentName string) map[string]bool {
-	// Start with persistent preferences
-	effective := make(map[string]bool)
-	persistent := a.GetPersistentAgentOverrides(agentName)
-	for agent, enabled := range persistent {
-		effective[agent] = enabled
-	}
-
-	// If there's an active session, overlay session overrides
-	if a.HasActiveSession() {
-		sessionOverrides := a.GetSessionAgentOverrides(agentName)
-		for agent, enabled := range sessionOverrides {
-			effective[agent] = enabled
-		}
-	}
-
-	return effective
 }
 
 type SessionCreatedMsg = struct {
@@ -246,11 +195,8 @@ type ToolsUpdatedMsg struct {
 	Overrides map[string]bool
 }
 
-// AgentsUpdatedMsg is emitted when agent overrides are updated via the dialog
-// Overrides contains only explicit deviations (true/false) from defaults
-// When Overrides is empty the entry should be removed
-// The dialog implementation will compute these overrides prior to emitting the message
-// NOTE: Overrides are session-scoped and NOT persisted to disk.
+// AgentsUpdatedMsg is emitted when subagent overrides are updated via the dialog
+// (kept as AgentsUpdatedMsg for backwards compatibility, but represents subagent changes)
 type AgentsUpdatedMsg struct {
 	Overrides map[string]bool
 }
@@ -855,12 +801,15 @@ func (a *App) CreateSession(ctx context.Context) (*opencode.Session, error) {
 
 func (a *App) SendPrompt(ctx context.Context, prompt Prompt) (*App, tea.Cmd) {
 	var cmds []tea.Cmd
+	var isNewSession bool
+
 	if a.Session.ID == "" {
 		session, err := a.CreateSession(ctx)
 		if err != nil {
 			return a, toast.NewErrorToast(err.Error())
 		}
 		a.Session = session
+		isNewSession = true
 		cmds = append(cmds, util.CmdHandler(SessionCreatedMsg{Session: session}))
 	}
 
@@ -877,12 +826,33 @@ func (a *App) SendPrompt(ctx context.Context, prompt Prompt) (*App, tea.Cmd) {
 			MessageID:  opencode.F(messageID),
 			Parts:      opencode.F(message.ToSessionChatParams()),
 		}
-		if ov := a.GetEffectiveToolOverrides(a.Agent().Name); len(ov) > 0 {
+
+		// Always use current effective overrides (which are just session overrides now)
+		if ov := a.GetSessionToolOverrides(a.Agent().Name); len(ov) > 0 {
 			params.Tools = opencode.F(ov)
 		}
-		if av := a.GetEffectiveAgentOverrides(a.Agent().Name); len(av) > 0 {
+		if av := a.GetSessionSubagentOverrides(a.Agent().Name); len(av) > 0 {
 			params.Agents = opencode.F(av)
 		}
+
+		// If this is a new session, save current overrides to session storage
+		if isNewSession {
+			currentAgent := a.Agent().Name
+			toolOverrides := a.GetSessionToolOverrides(currentAgent)
+			agentOverrides := a.GetSessionSubagentOverrides(currentAgent)
+
+			if len(toolOverrides) > 0 {
+				go func() {
+					_ = a.SaveSessionToolOverrides(context.Background(), currentAgent, toolOverrides)
+				}()
+			}
+			if len(agentOverrides) > 0 {
+				go func() {
+					_ = a.SaveSessionSubagentOverrides(context.Background(), currentAgent, agentOverrides)
+				}()
+			}
+		}
+
 		_, err := a.Client.Session.Chat(ctx, a.Session.ID, params)
 		if err != nil {
 			errormsg := fmt.Sprintf("failed to send message: %v", err)
@@ -979,55 +949,215 @@ func (a *App) ListProviders(ctx context.Context) ([]opencode.Provider, error) {
 	return providers.Providers, nil
 }
 
-type ResourceInfo struct {
+type ToolInfo struct {
 	Name           string `json:"name"`
 	Description    string `json:"description,omitempty"`
-	Type           string `json:"type"`           // "tool" or "agent"
-	Source         string `json:"source"`         // "builtin"/"mcp" for tools, "subagent"/"primary"/"all" for agents
+	Source         string `json:"source"`         // "builtin" or "mcp"
 	DefaultEnabled *bool  `json:"defaultEnabled"` // pointer to allow nil detection
 }
 
-// IsResourceDefaultEnabled returns whether a resource is enabled by default
-func IsResourceDefaultEnabled(resource ResourceInfo) bool {
-	if resource.DefaultEnabled != nil {
-		return *resource.DefaultEnabled
+type AgentInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Mode        string `json:"mode"` // "subagent", "primary", "all"
+}
+
+// IsToolDefaultEnabled returns whether a tool is enabled by default
+func IsToolDefaultEnabled(tool ToolInfo) bool {
+	if tool.DefaultEnabled != nil {
+		return *tool.DefaultEnabled
 	}
 	return true
 }
 
-func (a *App) ListResources(ctx context.Context, resourceType string) (map[string]ResourceInfo, error) {
+func (a *App) ListTools(ctx context.Context) (map[string]ToolInfo, error) {
 	u := os.Getenv("OPENCODE_SERVER")
 	if u == "" {
 		return nil, fmt.Errorf("OPENCODE_SERVER environment variable not set")
 	}
-	u = strings.TrimSuffix(u, "/") + "/app/resources/" + resourceType
+	u = strings.TrimSuffix(u, "/") + "/app/tools"
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create %s request: %w", resourceType, err)
+		return nil, fmt.Errorf("create tools request: %w", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetch %s: %w", resourceType, err)
+		return nil, fmt.Errorf("fetch tools: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s API status %d", resourceType, resp.StatusCode)
+		return nil, fmt.Errorf("tools API status %d", resp.StatusCode)
 	}
-	var resources map[string]ResourceInfo
-	if err := json.NewDecoder(resp.Body).Decode(&resources); err != nil {
-		return nil, fmt.Errorf("decode %s: %w", resourceType, err)
+	var tools map[string]ToolInfo
+	if err := json.NewDecoder(resp.Body).Decode(&tools); err != nil {
+		return nil, fmt.Errorf("decode tools: %w", err)
 	}
-	return resources, nil
+	return tools, nil
 }
 
-func (a *App) ListTools(ctx context.Context) (map[string]ResourceInfo, error) {
-	return a.ListResources(ctx, "tool")
+func (a *App) ListAgents(ctx context.Context) ([]AgentInfo, error) {
+	u := os.Getenv("OPENCODE_SERVER")
+	if u == "" {
+		return nil, fmt.Errorf("OPENCODE_SERVER environment variable not set")
+	}
+	u = strings.TrimSuffix(u, "/") + "/agent"
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create agents request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch agents: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("agents API status %d", resp.StatusCode)
+	}
+	var agents []AgentInfo
+	if err := json.NewDecoder(resp.Body).Decode(&agents); err != nil {
+		return nil, fmt.Errorf("decode agents: %w", err)
+	}
+	return agents, nil
 }
 
-func (a *App) ListAgents(ctx context.Context) (map[string]ResourceInfo, error) {
-	return a.ListResources(ctx, "agent")
+// LoadSessionOverrides loads tool and subagent overrides for a specific session
+func (a *App) LoadSessionOverrides(ctx context.Context, sessionID string) error {
+	u := os.Getenv("OPENCODE_SERVER")
+	if u == "" {
+		return fmt.Errorf("OPENCODE_SERVER environment variable not set")
+	}
+
+	// Load all overrides for this session in one call
+	overridesURL := strings.TrimSuffix(u, "/") + "/session/" + sessionID + "/overrides"
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, overridesURL, nil)
+	if err != nil {
+		return fmt.Errorf("create overrides request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("fetch overrides: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		// Response contains all agent overrides: { agentName: { tools: {...}, agents: {...} } }
+		var allOverrides map[string]struct {
+			Tools  map[string]bool `json:"tools"`
+			Agents map[string]bool `json:"agents"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&allOverrides); err != nil {
+			return fmt.Errorf("decode overrides: %w", err)
+		}
+
+		// Initialize session overrides structure
+		if sessionOverrides[sessionID] == nil {
+			sessionOverrides[sessionID] = &sessionResourceOverrides{
+				AgentOverrides: make(map[string]map[string]map[string]bool),
+			}
+		}
+
+		// Load overrides for each agent
+		for agentName, payload := range allOverrides {
+			if sessionOverrides[sessionID].AgentOverrides[agentName] == nil {
+				sessionOverrides[sessionID].AgentOverrides[agentName] = make(map[string]map[string]bool)
+			}
+			if payload.Tools != nil && len(payload.Tools) > 0 {
+				sessionOverrides[sessionID].AgentOverrides[agentName]["tool"] = payload.Tools
+			}
+			if payload.Agents != nil && len(payload.Agents) > 0 {
+				sessionOverrides[sessionID].AgentOverrides[agentName]["agent"] = payload.Agents
+			}
+		}
+	}
+
+	return nil
+}
+
+// SaveSessionToolOverrides saves tool overrides for a specific agent to the server
+func (a *App) SaveSessionToolOverrides(ctx context.Context, agentName string, overrides map[string]bool) error {
+	u := os.Getenv("OPENCODE_SERVER")
+	if u == "" {
+		return fmt.Errorf("OPENCODE_SERVER environment variable not set")
+	}
+
+	// Send combined overrides payload to unified endpoint
+	url := strings.TrimSuffix(u, "/") + "/session/" + a.Session.ID + "/" + agentName + "/overrides"
+	bodyData := map[string]interface{}{
+		"tools": overrides,
+	}
+
+	body, err := json.Marshal(bodyData)
+	if err != nil {
+		return fmt.Errorf("marshal overrides: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("create overrides request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("save overrides: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// SaveSessionSubagentOverrides saves subagent overrides for a specific agent to the server
+func (a *App) SaveSessionSubagentOverrides(ctx context.Context, agentName string, overrides map[string]bool) error {
+	u := os.Getenv("OPENCODE_SERVER")
+	if u == "" {
+		return fmt.Errorf("OPENCODE_SERVER environment variable not set")
+	}
+
+	// Send combined overrides payload to unified endpoint
+	url := strings.TrimSuffix(u, "/") + "/session/" + a.Session.ID + "/" + agentName + "/overrides"
+	bodyData := map[string]interface{}{
+		"agents": overrides,
+	}
+
+	body, err := json.Marshal(bodyData)
+	if err != nil {
+		return fmt.Errorf("marshal overrides: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, strings.NewReader(string(body)))
+	if err != nil {
+		return fmt.Errorf("create overrides request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("save overrides: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 // Removed getFallbackTools() - server is the single source of truth

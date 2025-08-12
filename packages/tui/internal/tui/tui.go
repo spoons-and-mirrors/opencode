@@ -387,6 +387,8 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case app.SessionClearedMsg:
 		a.app.Session = &opencode.Session{}
 		a.app.Messages = []app.Message{}
+		// Clear home screen overrides to ensure clean defaults
+		a.app.ClearHomeScreenOverrides()
 	case dialog.CompletionDialogCloseMsg:
 		a.showCompletionDialog = false
 	case opencode.EventListResponseEventInstallationUpdated:
@@ -584,10 +586,33 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			slog.Error("Failed to list messages", "error", err.Error())
 			return a, toast.NewErrorToast("Failed to open session")
 		}
+
+		// Load session-specific overrides (tools and subagents)
+		if err := a.app.LoadSessionOverrides(context.Background(), msg.ID); err != nil {
+			slog.Warn("Failed to load session overrides", "sessionID", msg.ID, "error", err)
+			// Continue anyway, don't fail the session switch
+		}
+
 		a.app.Session = msg
 		a.app.Messages = messages
 		return a, util.CmdHandler(app.SessionLoadedMsg{})
 	case app.SessionCreatedMsg:
+		// Copy any home screen overrides (stored under "" key) to the new session
+		a.app.TransferHomeScreenOverrides(msg.Session.ID)
+
+		// Immediately persist transferred overrides to the server
+		currentAgent := a.app.Agent().Name
+		if toolOverrides := a.app.GetSessionToolOverrides(currentAgent); len(toolOverrides) > 0 {
+			go func() {
+				_ = a.app.SaveSessionToolOverrides(context.Background(), currentAgent, toolOverrides)
+			}()
+		}
+		if agentOverrides := a.app.GetSessionSubagentOverrides(currentAgent); len(agentOverrides) > 0 {
+			go func() {
+				_ = a.app.SaveSessionSubagentOverrides(context.Background(), currentAgent, agentOverrides)
+			}()
+		}
+
 		a.app.Session = msg.Session
 		return a, util.CmdHandler(app.SessionLoadedMsg{})
 	case app.MessageRevertedMsg:
@@ -634,15 +659,37 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, a.app.SaveState())
 	case app.ToolsUpdatedMsg:
 		if a.app.HasActiveSession() {
-			a.app.SetPersistentToolOverrides(msg.Agent, msg.Overrides)
-			cmds = append(cmds, a.app.SaveState())
+			// Update session-specific overrides (in-memory)
+			a.app.SetSessionToolOverrides(msg.Agent, msg.Overrides)
+			// Send to server for persistence across sessions
+			cmds = append(cmds, func() tea.Msg {
+				if err := a.app.SaveSessionToolOverrides(context.Background(), msg.Agent, msg.Overrides); err != nil {
+					return toast.NewErrorToast("Failed to save tool settings")()
+				}
+				return nil
+			})
+			cmds = append(cmds, toast.NewSuccessToast("Tools updated"))
+		} else {
+			// No active session - just store in memory (no persistence)
+			a.app.SetSessionToolOverrides(msg.Agent, msg.Overrides)
 			cmds = append(cmds, toast.NewSuccessToast("Tools updated"))
 		}
 	case app.AgentsUpdatedMsg:
 		if a.app.HasActiveSession() {
-			a.app.SetPersistentAgentOverrides(a.app.Agent().Name, msg.Overrides)
-			cmds = append(cmds, a.app.SaveState())
-			cmds = append(cmds, toast.NewSuccessToast("Agents updated"))
+			// Update session-specific overrides (in-memory)
+			a.app.SetSessionSubagentOverrides(a.app.Agent().Name, msg.Overrides)
+			// Send to server for persistence across sessions
+			cmds = append(cmds, func() tea.Msg {
+				if err := a.app.SaveSessionSubagentOverrides(context.Background(), a.app.Agent().Name, msg.Overrides); err != nil {
+					return toast.NewErrorToast("Failed to save subagent settings")()
+				}
+				return nil
+			})
+			cmds = append(cmds, toast.NewSuccessToast("Subagents updated"))
+		} else {
+			// No active session - just store in memory (no persistence)
+			a.app.SetSessionSubagentOverrides(a.app.Agent().Name, msg.Overrides)
+			cmds = append(cmds, toast.NewSuccessToast("Subagents updated"))
 		}
 	case dialog.ThemeSelectedMsg:
 		a.app.State.Theme = msg.ThemeName

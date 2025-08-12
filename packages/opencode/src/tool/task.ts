@@ -19,9 +19,9 @@ export const TaskTool = Tool.define("task", async () => {
     async execute(params, ctx) {
       // Check if the requested agent is disabled by session overrides
       if (ctx.sessionID && ctx.agent) {
-        const agentOverrides = Session.getAgentOverrides(ctx.sessionID, ctx.agent)
+        const overrides = Session.getOverrides(ctx.sessionID, ctx.agent)
         // Use same logic as autocomplete: if explicitly set to false, block it
-        if (agentOverrides[params.subagent_type] === false) {
+        if (overrides.agents[params.subagent_type] === false) {
           throw new Error(`Agent ${params.subagent_type} is disabled in the current session`)
         }
       }

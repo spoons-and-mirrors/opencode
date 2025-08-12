@@ -137,10 +137,10 @@ func (r ResourceItem) Selectable() bool {
 	return r.IsSelectable
 }
 
-// IsResourceDefaultEnabled returns whether a resource is enabled by default
-func IsResourceDefaultEnabled(resource app.ResourceInfo) bool {
-	if resource.DefaultEnabled != nil {
-		return *resource.DefaultEnabled
+// IsToolDefaultEnabled returns whether a tool is enabled by default
+func IsToolDefaultEnabled(tool app.ToolInfo) bool {
+	if tool.DefaultEnabled != nil {
+		return *tool.DefaultEnabled
 	}
 	return true
 }
