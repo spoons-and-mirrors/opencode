@@ -30,6 +30,7 @@ type sessionItem struct {
 	title              string
 	isDeleteConfirming bool
 	isCurrentSession   bool
+	isPinned           bool
 }
 
 func (s sessionItem) Render(
@@ -44,10 +45,14 @@ func (s sessionItem) Render(
 	if s.isDeleteConfirming {
 		text = "Press again to confirm delete"
 	} else {
+		prefix := ""
+		if s.isPinned {
+			prefix = "📌 "
+		}
 		if s.isCurrentSession {
-			text = "● " + s.title
+			text = prefix + "● " + s.title
 		} else {
-			text = s.title
+			text = prefix + s.title
 		}
 	}
 
@@ -104,16 +109,17 @@ func (s sessionItem) Selectable() bool {
 }
 
 type sessionDialog struct {
-	width              int
-	height             int
-	modal              *modal.Modal
-	sessions           []opencode.Session
-	list               list.List[sessionItem]
-	app                *app.App
-	deleteConfirmation int // -1 means no confirmation, >= 0 means confirming deletion of session at this index
-	renameMode         bool
-	renameInput        textinput.Model
-	renameIndex        int // index of session being renamed
+	width                int
+	height               int
+	modal                *modal.Modal
+	sessions             []opencode.Session
+	list                 list.List[sessionItem]
+	app                  *app.App
+	deleteConfirmationID string // session ID for delete confirmation, empty means no confirmation
+	renameMode           bool
+	renameInput          textinput.Model
+	renameIndex          int  // index of session being renamed
+	pinnedViewMode       bool // true = show only pinned sessions, false = show all sessions
 }
 
 func (s *sessionDialog) Init() tea.Cmd {
@@ -162,16 +168,15 @@ func (s *sessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			switch msg.String() {
 			case "enter":
-				if s.deleteConfirmation >= 0 {
-					s.deleteConfirmation = -1
+				if s.deleteConfirmationID != "" {
+					s.deleteConfirmationID = ""
 					s.updateListItems()
 					return s, nil
 				}
-				if _, idx := s.list.GetSelectedItem(); idx >= 0 && idx < len(s.sessions) {
-					selectedSession := s.sessions[idx]
+				if selectedSession := s.getSelectedSession(); selectedSession != nil {
 					return s, tea.Sequence(
 						util.CmdHandler(modal.CloseModalMsg{}),
-						util.CmdHandler(app.SessionSelectedMsg(&selectedSession)),
+						util.CmdHandler(app.SessionSelectedMsg(selectedSession)),
 					)
 				}
 			case "n":
@@ -180,38 +185,84 @@ func (s *sessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					util.CmdHandler(app.SessionClearedMsg{}),
 				)
 			case "r":
-				if _, idx := s.list.GetSelectedItem(); idx >= 0 && idx < len(s.sessions) {
+				if selectedSession := s.getSelectedSession(); selectedSession != nil {
 					s.renameMode = true
-					s.renameIndex = idx
-					s.setupRenameInput(s.sessions[idx].Title)
+					// Store the session ID instead of index for rename
+					for i, sess := range s.sessions {
+						if sess.ID == selectedSession.ID {
+							s.renameIndex = i
+							break
+						}
+					}
+					s.setupRenameInput(selectedSession.Title)
 					s.modal.SetTitle("Rename Session")
 					s.updateListItems()
 					return s, textinput.Blink
 				}
+			case "p":
+				if selectedSession := s.getSelectedSession(); selectedSession != nil {
+					newPinnedState := !selectedSession.Pinned
+					return s, tea.Sequence(
+						func() tea.Msg {
+							ctx := context.Background()
+							err := s.app.PinSession(ctx, selectedSession.ID, newPinnedState)
+							if err != nil {
+								return toast.NewErrorToast("Failed to pin/unpin session: " + err.Error())()
+							}
+							// Update the session in the main sessions list
+							for i := range s.sessions {
+								if s.sessions[i].ID == selectedSession.ID {
+									s.sessions[i].Pinned = newPinnedState
+									break
+								}
+							}
+							s.updateListItems()
+							pinText := "pinned"
+							if !newPinnedState {
+								pinText = "unpinned"
+							}
+							return toast.NewSuccessToast("Session " + pinText + " successfully")()
+						},
+					)
+				}
+			case "P":
+				s.pinnedViewMode = !s.pinnedViewMode
+				if s.pinnedViewMode {
+					s.modal.SetTitle("Switch Session (Pinned Only)")
+				} else {
+					s.modal.SetTitle("Switch Session")
+				}
+				s.updateListItems()
+				return s, nil
 			case "x", "delete", "backspace":
-				if _, idx := s.list.GetSelectedItem(); idx >= 0 && idx < len(s.sessions) {
-					if s.deleteConfirmation == idx {
+				if selectedSession := s.getSelectedSession(); selectedSession != nil {
+					if s.deleteConfirmationID == selectedSession.ID {
 						// Second press - actually delete the session
-						sessionToDelete := s.sessions[idx]
 						return s, tea.Sequence(
 							func() tea.Msg {
-								s.sessions = slices.Delete(s.sessions, idx, idx+1)
-								s.deleteConfirmation = -1
+								// Remove from sessions list
+								for i, sess := range s.sessions {
+									if sess.ID == selectedSession.ID {
+										s.sessions = slices.Delete(s.sessions, i, i+1)
+										break
+									}
+								}
+								s.deleteConfirmationID = ""
 								s.updateListItems()
 								return nil
 							},
-							s.deleteSession(sessionToDelete.ID),
+							s.deleteSession(selectedSession.ID),
 						)
 					} else {
 						// First press - enter delete confirmation mode
-						s.deleteConfirmation = idx
+						s.deleteConfirmationID = selectedSession.ID
 						s.updateListItems()
 						return s, nil
 					}
 				}
 			case "esc":
-				if s.deleteConfirmation >= 0 {
-					s.deleteConfirmation = -1
+				if s.deleteConfirmationID != "" {
+					s.deleteConfirmationID = ""
 					s.updateListItems()
 					return s, nil
 				}
@@ -248,7 +299,7 @@ func (s *sessionDialog) Render(background string) string {
 	keyStyle := styles.NewStyle().Foreground(t.Text()).Background(t.BackgroundPanel()).Render
 	mutedStyle := styles.NewStyle().Foreground(t.TextMuted()).Background(t.BackgroundPanel()).Render
 
-	leftHelp := keyStyle("n") + mutedStyle(" new session") + " " + keyStyle("r") + mutedStyle(" rename")
+	leftHelp := keyStyle("n") + mutedStyle(" new session") + " " + keyStyle("r") + mutedStyle(" rename") + " " + keyStyle("p") + mutedStyle(" pin") + " " + keyStyle("P") + mutedStyle(" pinned view")
 	rightHelp := keyStyle("x/del") + mutedStyle(" delete session")
 
 	bgColor := t.BackgroundPanel()
@@ -299,20 +350,59 @@ func (s *sessionDialog) setupRenameInput(currentTitle string) {
 		Lipgloss()
 }
 
+func (s *sessionDialog) getSelectedSession() *opencode.Session {
+	selectedItem, idx := s.list.GetSelectedItem()
+	if idx < 0 {
+		return nil
+	}
+
+	// Find the session by title since we don't store the ID in sessionItem
+	for i := range s.sessions {
+		if s.sessions[i].Title == selectedItem.title {
+			return &s.sessions[i]
+		}
+	}
+	return nil
+}
+
 func (s *sessionDialog) updateListItems() {
 	_, currentIdx := s.list.GetSelectedItem()
 
+	// Filter sessions based on pinned view mode
+	var filteredSessions []opencode.Session
+	if s.pinnedViewMode {
+		for _, sess := range s.sessions {
+			if sess.Pinned {
+				filteredSessions = append(filteredSessions, sess)
+			}
+		}
+		// Only sort in pinned-only view - sort by title
+		slices.SortFunc(filteredSessions, func(a, b opencode.Session) int {
+			return strings.Compare(a.Title, b.Title)
+		})
+	} else {
+		// In regular view, maintain original order (no sorting)
+		filteredSessions = s.sessions
+	}
+
 	var items []sessionItem
-	for i, sess := range s.sessions {
+	for _, sess := range filteredSessions {
 		item := sessionItem{
 			title:              sess.Title,
-			isDeleteConfirming: s.deleteConfirmation == i,
+			isDeleteConfirming: s.deleteConfirmationID == sess.ID,
 			isCurrentSession:   s.app.Session != nil && s.app.Session.ID == sess.ID,
+			isPinned:           sess.Pinned,
 		}
 		items = append(items, item)
 	}
 	s.list.SetItems(items)
-	s.list.SetSelectedIndex(currentIdx)
+
+	// Adjust selected index if necessary
+	if currentIdx >= len(items) && len(items) > 0 {
+		s.list.SetSelectedIndex(len(items) - 1)
+	} else {
+		s.list.SetSelectedIndex(currentIdx)
+	}
 }
 
 func (s *sessionDialog) deleteSession(sessionID string) tea.Cmd {
@@ -359,6 +449,7 @@ func NewSessionDialog(app *app.App) SessionDialog {
 			title:              sess.Title,
 			isDeleteConfirming: false,
 			isCurrentSession:   app.Session != nil && app.Session.ID == sess.ID,
+			isPinned:           sess.Pinned,
 		})
 	}
 
@@ -379,12 +470,13 @@ func NewSessionDialog(app *app.App) SessionDialog {
 	listComponent.SetMaxWidth(layout.Current.Container.Width - 12)
 
 	return &sessionDialog{
-		sessions:           filteredSessions,
-		list:               listComponent,
-		app:                app,
-		deleteConfirmation: -1,
-		renameMode:         false,
-		renameIndex:        -1,
+		sessions:             filteredSessions,
+		list:                 listComponent,
+		app:                  app,
+		deleteConfirmationID: "",
+		renameMode:           false,
+		renameIndex:          -1,
+		pinnedViewMode:       false,
 		modal: modal.New(
 			modal.WithTitle("Switch Session"),
 			modal.WithMaxWidth(layout.Current.Container.Width-8),

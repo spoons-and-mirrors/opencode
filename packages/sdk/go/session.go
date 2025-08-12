@@ -1263,6 +1263,7 @@ type Session struct {
 	Title    string        `json:"title,required"`
 	Version  string        `json:"version,required"`
 	ParentID string        `json:"parentID"`
+	Pinned   bool          `json:"pinned"`
 	Revert   SessionRevert `json:"revert"`
 	Share    SessionShare  `json:"share"`
 	JSON     sessionJSON   `json:"-"`
@@ -1275,6 +1276,7 @@ type sessionJSON struct {
 	Title       apijson.Field
 	Version     apijson.Field
 	ParentID    apijson.Field
+	Pinned      apijson.Field
 	Revert      apijson.Field
 	Share       apijson.Field
 	raw         string
@@ -2395,7 +2397,8 @@ func (r SessionSummarizeParams) MarshalJSON() (data []byte, err error) {
 }
 
 type SessionUpdateParams struct {
-	Title param.Field[string] `json:"title"`
+	Title  param.Field[string] `json:"title"`
+	Pinned param.Field[bool]   `json:"pinned"`
 }
 
 

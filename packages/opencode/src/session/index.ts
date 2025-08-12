@@ -86,6 +86,7 @@ export namespace Session {
           diff: z.string().optional(),
         })
         .optional(),
+      pinned: z.boolean().optional(),
     })
     .openapi({
       ref: "Session",

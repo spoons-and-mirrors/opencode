@@ -834,6 +834,17 @@ func (a *App) UpdateSession(ctx context.Context, sessionID string, title string)
 	return nil
 }
 
+func (a *App) PinSession(ctx context.Context, sessionID string, pinned bool) error {
+	_, err := a.Client.Session.Update(ctx, sessionID, opencode.SessionUpdateParams{
+		Pinned: opencode.F(pinned),
+	})
+	if err != nil {
+		slog.Error("Failed to pin/unpin session", "error", err)
+		return err
+	}
+	return nil
+}
+
 func (a *App) ListMessages(ctx context.Context, sessionId string) ([]Message, error) {
 	response, err := a.Client.Session.Messages(ctx, sessionId)
 	if err != nil {

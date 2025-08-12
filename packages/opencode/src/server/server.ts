@@ -323,6 +323,7 @@ export namespace Server {
           "json",
           z.object({
             title: z.string().optional(),
+            pinned: z.boolean().optional(),
           }),
         ),
         async (c) => {
@@ -332,6 +333,9 @@ export namespace Server {
           const updatedSession = await Session.update(sessionID, (session) => {
             if (updates.title !== undefined) {
               session.title = updates.title
+            }
+            if (updates.pinned !== undefined) {
+              session.pinned = updates.pinned
             }
           })
 
