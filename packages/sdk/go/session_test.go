@@ -25,7 +25,7 @@ func TestSessionNew(t *testing.T) {
 	client := opencode.NewClient(
 		option.WithBaseURL(baseURL),
 	)
-	_, err := client.Session.New(context.TODO())
+	_, err := client.Session.New(context.TODO(), opencode.SessionNewParams{})
 	if err != nil {
 		var apierr *opencode.Error
 		if errors.As(err, &apierr) {

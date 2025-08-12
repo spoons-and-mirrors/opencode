@@ -39,10 +39,10 @@ func NewSessionService(opts ...option.RequestOption) (r *SessionService) {
 }
 
 // Create a new session
-func (r *SessionService) New(ctx context.Context, opts ...option.RequestOption) (res *Session, err error) {
+func (r *SessionService) New(ctx context.Context, body SessionNewParams, opts ...option.RequestOption) (res *Session, err error) {
 	opts = append(r.Options[:], opts...)
 	path := "session"
-	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, &res, opts...)
 	return
 }
 
@@ -63,6 +63,18 @@ func (r *SessionService) Delete(ctx context.Context, id string, opts ...option.R
 	}
 	path := fmt.Sprintf("session/%s", id)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodDelete, path, nil, &res, opts...)
+	return
+}
+
+// Update a session
+func (r *SessionService) Update(ctx context.Context, id string, body SessionUpdateParams, opts ...option.RequestOption) (res *Session, err error) {
+	opts = append(r.Options[:], opts...)
+	if id == "" {
+		err = errors.New("missing required id parameter")
+		return
+	}
+	path := fmt.Sprintf("session/%s", id)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPatch, path, body, &res, opts...)
 	return
 }
 
@@ -1238,6 +1250,7 @@ type Session struct {
 	Time     SessionTime   `json:"time,required"`
 	Title    string        `json:"title,required"`
 	Version  string        `json:"version,required"`
+	Agent    string        `json:"agent"`
 	ParentID string        `json:"parentID"`
 	Revert   SessionRevert `json:"revert"`
 	Share    SessionShare  `json:"share"`
@@ -1250,6 +1263,7 @@ type sessionJSON struct {
 	Time        apijson.Field
 	Title       apijson.Field
 	Version     apijson.Field
+	Agent       apijson.Field
 	ParentID    apijson.Field
 	Revert      apijson.Field
 	Share       apijson.Field
@@ -2345,6 +2359,22 @@ type SessionRevertParams struct {
 }
 
 func (r SessionRevertParams) MarshalJSON() (data []byte, err error) {
+	return apijson.MarshalRoot(r)
+}
+
+type SessionUpdateParams struct {
+	Agent param.Field[string] `json:"agent"`
+}
+
+func (r SessionUpdateParams) MarshalJSON() (data []byte, err error) {
+	return apijson.MarshalRoot(r)
+}
+
+type SessionNewParams struct {
+	Agent param.Field[string] `json:"agent"`
+}
+
+func (r SessionNewParams) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
 }
 

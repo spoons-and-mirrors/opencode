@@ -63,6 +63,7 @@ export namespace Session {
     .object({
       id: Identifier.schema("session"),
       parentID: Identifier.schema("session").optional(),
+      agent: z.string().optional(),
       share: z
         .object({
           url: z.string(),
@@ -159,11 +160,12 @@ export namespace Session {
     },
   )
 
-  export async function create(parentID?: string) {
+  export async function create(parentID?: string, agent?: string) {
     const result: Info = {
       id: Identifier.descending("session"),
       version: Installation.VERSION,
       parentID,
+      agent,
       title: createDefaultTitle(!!parentID),
       time: {
         created: Date.now(),

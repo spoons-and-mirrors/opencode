@@ -579,7 +579,33 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		a.app.Session = msg
 		a.app.Messages = messages
-		return a, util.CmdHandler(app.SessionLoadedMsg{})
+
+		// Restore session's agent if it has one
+		if msg.Agent != "" {
+			if agentIndex := a.app.FindAgentIndex(msg.Agent); agentIndex >= 0 {
+				a.app.AgentIndex = agentIndex
+				a.app.State.Agent = msg.Agent
+
+				// Switch to the agent's preferred model if available
+				if model, ok := a.app.State.AgentModel[msg.Agent]; ok {
+					for _, provider := range a.app.Providers {
+						if provider.ID == model.ProviderID {
+							a.app.Provider = &provider
+							for _, m := range provider.Models {
+								if m.ID == model.ModelID {
+									a.app.Model = &m
+									break
+								}
+							}
+							break
+						}
+					}
+				}
+				cmds = append(cmds, a.app.SaveState())
+			}
+		}
+
+		return a, tea.Sequence(append(cmds, util.CmdHandler(app.SessionLoadedMsg{}))...)
 	case app.SessionCreatedMsg:
 		a.app.Session = msg.Session
 		return a, util.CmdHandler(app.SessionLoadedMsg{})
@@ -605,6 +631,21 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		a.app.State.Agent = msg.Agent.Name
+
+		// Update current session's agent if we have an active session
+		if a.app.Session != nil && a.app.Session.ID != "" {
+			a.app.Session.Agent = msg.Agent.Name
+			// Update backend to persist session agent change
+			go func() {
+				params := opencode.SessionUpdateParams{
+					Agent: opencode.F(msg.Agent.Name),
+				}
+				_, err := a.app.Client.Session.Update(context.Background(), a.app.Session.ID, params)
+				if err != nil {
+					slog.Error("Failed to update session agent", "sessionID", a.app.Session.ID, "agent", msg.Agent.Name, "error", err)
+				}
+			}()
+		}
 
 		// Switch to the agent's preferred model if available
 		if model, ok := a.app.State.AgentModel[msg.Agent.Name]; ok {

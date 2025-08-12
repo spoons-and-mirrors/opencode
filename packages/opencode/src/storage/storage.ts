@@ -88,6 +88,22 @@ export namespace Storage {
         } catch (e) {}
       }
     },
+    async (dir: string) => {
+      const files = new Bun.Glob("session/info/*.json").scanSync({
+        cwd: dir,
+        absolute: true,
+      })
+      for (const file of files) {
+        try {
+          const content = await Bun.file(file).json()
+          if (content.agent === undefined) {
+            log.info("adding agent field to session", { file })
+            content.agent = "build"
+            await Bun.write(file, JSON.stringify(content, null, 2))
+          }
+        } catch (e) {}
+      }
+    },
   ]
 
   const state = App.state("storage", async () => {

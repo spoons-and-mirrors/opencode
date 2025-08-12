@@ -55,6 +55,15 @@ func (a *App) Agent() *opencode.Agent {
 	return &a.Agents[a.AgentIndex]
 }
 
+func (a *App) FindAgentIndex(agentName string) int {
+	for i, agent := range a.Agents {
+		if agent.Name == agentName {
+			return i
+		}
+	}
+	return -1
+}
+
 type SessionCreatedMsg = struct {
 	Session *opencode.Session
 }
@@ -272,6 +281,22 @@ func (a *App) cycleMode(forward bool) (*App, tea.Cmd) {
 	}
 
 	a.State.Agent = a.Agent().Name
+
+	// Update current session's agent if we have an active session
+	if a.Session != nil && a.Session.ID != "" {
+		a.Session.Agent = a.Agent().Name
+		// Update backend to persist session agent change
+		go func() {
+			params := opencode.SessionUpdateParams{
+				Agent: opencode.F(a.Agent().Name),
+			}
+			_, err := a.Client.Session.Update(context.Background(), a.Session.ID, params)
+			if err != nil {
+				slog.Error("Failed to update session agent", "sessionID", a.Session.ID, "agent", a.Agent().Name, "error", err)
+			}
+		}()
+	}
+
 	return a, a.SaveState()
 }
 
@@ -638,7 +663,11 @@ func (a *App) MarkProjectInitialized(ctx context.Context) error {
 }
 
 func (a *App) CreateSession(ctx context.Context) (*opencode.Session, error) {
-	session, err := a.Client.Session.New(ctx)
+	params := opencode.SessionNewParams{}
+	if a.Agent() != nil {
+		params.Agent = opencode.F(a.Agent().Name)
+	}
+	session, err := a.Client.Session.New(ctx, params)
 	if err != nil {
 		return nil, err
 	}

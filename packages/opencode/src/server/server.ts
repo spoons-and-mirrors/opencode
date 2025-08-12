@@ -264,8 +264,10 @@ export namespace Server {
             },
           },
         }),
+        zValidator("json", z.object({ agent: z.string().optional() }).optional()),
         async (c) => {
-          const session = await Session.create()
+          const body = c.req.valid("json")
+          const session = await Session.create(undefined, body?.agent)
           return c.json(session)
         },
       )
@@ -294,6 +296,41 @@ export namespace Server {
         async (c) => {
           await Session.remove(c.req.valid("param").id)
           return c.json(true)
+        },
+      )
+      .patch(
+        "/session/:id",
+        describeRoute({
+          description: "Update a session",
+          operationId: "session.update",
+          responses: {
+            ...ERRORS,
+            200: {
+              description: "Successfully updated session",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Session ID" }),
+          }),
+        ),
+        zValidator("json", z.object({ agent: z.string().optional() })),
+        async (c) => {
+          const { id } = c.req.valid("param")
+          const body = c.req.valid("json")
+          const session = await Session.update(id, (draft) => {
+            if (body.agent !== undefined) {
+              draft.agent = body.agent
+            }
+          })
+          return c.json(session)
         },
       )
       .post(
