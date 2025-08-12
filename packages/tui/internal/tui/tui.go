@@ -59,6 +59,8 @@ const interruptDebounceTimeout = 1 * time.Second
 const exitDebounceTimeout = 1 * time.Second
 
 type Model struct {
+	tea.Model
+	tea.CursorModel
 	width, height        int
 	app                  *app.App
 	modal                layout.Modal
@@ -789,15 +791,17 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, tea.Batch(cmds...)
 }
 
-func (a Model) View() string {
+func (a Model) View() (string, *tea.Cursor) {
 	t := theme.CurrentTheme()
 
 	var mainLayout string
 
+	var editorX int
+	var editorY int
 	if a.app.Session.ID == "" {
-		mainLayout = a.home()
+		mainLayout, editorX, editorY = a.home()
 	} else {
-		mainLayout = a.chat()
+		mainLayout, editorX, editorY = a.chat()
 	}
 	mainLayout = styles.NewStyle().
 		Background(t.Background()).
@@ -821,7 +825,12 @@ func (a Model) View() string {
 	if theme.CurrentThemeUsesAnsiColors() {
 		mainLayout = util.ConvertRGBToAnsi16Colors(mainLayout)
 	}
-	return mainLayout + "\n" + a.status.View()
+
+	cursor := a.editor.Cursor()
+	cursor.Position.X += editorX
+	cursor.Position.Y += editorY
+
+	return mainLayout + "\n" + a.status.View(), cursor
 }
 
 func (a Model) Cleanup() {
@@ -848,7 +857,7 @@ func (a Model) openFile(filepath string) (tea.Model, tea.Cmd) {
 	return a, cmd
 }
 
-func (a Model) home() string {
+func (a Model) home() (string, int, int) {
 	t := theme.CurrentTheme()
 	effectiveWidth := a.width - 4
 	baseStyle := styles.NewStyle().Background(t.Background())
@@ -940,14 +949,21 @@ func (a Model) home() string {
 		styles.WhitespaceStyle(t.Background()),
 	)
 
-	editorX := (effectiveWidth - editorWidth) / 2
+	editorX := max(0, (effectiveWidth-editorWidth)/2)
 	editorY := (a.height / 2) + (mainHeight / 2) - 2
 
 	if editorLines > 1 {
+		content := a.editor.Content()
+		editorHeight := lipgloss.Height(content)
+
+		if editorY+editorHeight > a.height {
+			difference := (editorY + editorHeight) - a.height
+			editorY -= difference
+		}
 		mainLayout = layout.PlaceOverlay(
 			editorX,
 			editorY,
-			a.editor.Content(),
+			content,
 			mainLayout,
 		)
 	}
@@ -965,10 +981,10 @@ func (a Model) home() string {
 		)
 	}
 
-	return mainLayout
+	return mainLayout, editorX + 5, editorY + 2
 }
 
-func (a Model) chat() string {
+func (a Model) chat() (string, int, int) {
 	effectiveWidth := a.width - 4
 	t := theme.CurrentTheme()
 	editorView := a.editor.View()
@@ -985,14 +1001,20 @@ func (a Model) chat() string {
 	)
 
 	mainLayout := messagesView + "\n" + editorView
-	editorX := (effectiveWidth - editorWidth) / 2
+	editorX := max(0, (effectiveWidth-editorWidth)/2)
+	editorY := a.height - editorHeight
 
 	if lines > 1 {
-		editorY := a.height - editorHeight
+		content := a.editor.Content()
+		editorHeight := lipgloss.Height(content)
+		if editorY+editorHeight > a.height {
+			difference := (editorY + editorHeight) - a.height
+			editorY -= difference
+		}
 		mainLayout = layout.PlaceOverlay(
 			editorX,
 			editorY,
-			a.editor.Content(),
+			content,
 			mainLayout,
 		)
 	}
@@ -1011,7 +1033,7 @@ func (a Model) chat() string {
 		)
 	}
 
-	return mainLayout
+	return mainLayout, editorX + 5, editorY + 2
 }
 
 func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
