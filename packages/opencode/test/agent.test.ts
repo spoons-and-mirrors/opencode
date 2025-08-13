@@ -27,6 +27,7 @@ describe("Research Agent Configuration", () => {
     const researchAgent = {
       name: "research",
       description: "Expert research agent that systematically analyzes codebases and breaks down complex research tasks. Excels at codebase exploration, pattern analysis, and delegating focused research to subagents. Does not implement code - only researches and analyzes.",
+      prompt: "You are an expert research agent specializing in comprehensive codebase analysis and systematic research methodology...",
       tools: {
         write: false,
         edit: false,
@@ -86,6 +87,15 @@ describe("Research Agent Configuration", () => {
     expect(description).toContain("codebase")
     expect(description).toContain("subagents")
     expect(description).toContain("Does not implement code")
+  })
+
+  test("research agent has comprehensive system prompt", () => {
+    const prompt = "You are an expert research agent specializing in comprehensive codebase analysis and systematic research methodology..."
+    
+    expect(prompt).toBeTruthy()
+    expect(prompt).toContain("expert research agent")
+    expect(prompt).toContain("codebase analysis")
+    expect(prompt).toContain("systematic research methodology")
   })
 
   test("research agent configuration is read-only focused", () => {
