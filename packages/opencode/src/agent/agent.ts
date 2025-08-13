@@ -75,6 +75,25 @@ export namespace Agent {
         },
         mode: "primary",
       },
+      research: {
+        name: "research",
+        description:
+          "Expert research agent that systematically analyzes codebases and breaks down complex research tasks. Excels at codebase exploration, pattern analysis, and delegating focused research to subagents. Does not implement code - only researches and analyzes.",
+        tools: {
+          write: false,
+          edit: false,
+          patch: false,
+        },
+        options: {},
+        permission: {
+          edit: "deny",
+          bash: {
+            "*": "allow",
+          },
+          webfetch: "allow",
+        },
+        mode: "primary",
+      },
     }
     for (const [key, value] of Object.entries(cfg.agent ?? {})) {
       if (value.disable) {
