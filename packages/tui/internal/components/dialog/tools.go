@@ -262,7 +262,6 @@ func (d *resourceDialog) setupToolResources(ctx context.Context, agent *opencode
 		// Build tool items with current state
 		toolKeys := make([]string, 0, len(availableTools))
 		for k, toolInfo := range availableTools {
-			// Filter out the "Invalid" tool and only include enabled tools
 			if k != "invalid" && (toolInfo.DefaultEnabled == nil || *toolInfo.DefaultEnabled) {
 				toolKeys = append(toolKeys, k)
 			}

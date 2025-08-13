@@ -91,8 +91,6 @@ func (a *App) TransferHomeScreenOverrides(newSessionID string) {
 		}
 		sessionOverrides[newSessionID] = newOverrides
 
-		// Keep home screen overrides for future sessions
-		// Don't delete them - they should persist for new sessions
 	}
 }
 
@@ -858,7 +856,6 @@ func (a *App) SendPrompt(ctx context.Context, prompt Prompt) (*App, tea.Cmd) {
 			Parts:      opencode.F(message.ToSessionChatParams()),
 		}
 
-		// Always use current effective overrides (which are just session overrides now)
 		if ov := a.GetSessionToolOverrides(a.Agent().Name); len(ov) > 0 {
 			params.Tools = opencode.F(ov)
 		}

@@ -703,9 +703,7 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case app.AgentsUpdatedMsg:
 		if a.app.HasActiveSession() {
-			// Update session-specific overrides (in-memory)
 			a.app.SetSessionSubagentOverrides(a.app.Agent().Name, msg.Overrides)
-			// Send to server for persistence across sessions
 			cmds = append(cmds, func() tea.Msg {
 				if err := a.app.SaveSessionSubagentOverrides(context.Background(), a.app.Agent().Name, msg.Overrides); err != nil {
 					return toast.NewErrorToast("Failed to save subagent settings")()
@@ -714,7 +712,6 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 			cmds = append(cmds, toast.NewSuccessToast("Subagents updated"))
 		} else {
-			// No active session - just store in memory (no persistence)
 			a.app.SetSessionSubagentOverrides(a.app.Agent().Name, msg.Overrides)
 			cmds = append(cmds, toast.NewSuccessToast("Subagents updated"))
 		}
