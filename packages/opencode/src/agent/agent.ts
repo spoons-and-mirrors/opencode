@@ -7,6 +7,8 @@ import PROMPT_GENERATE from "./generate.txt"
 import { SystemPrompt } from "../session/system"
 import { mergeDeep } from "remeda"
 
+import PROMPT_RESEARCH from "../session/prompt/research.txt"
+
 export namespace Agent {
   export const Info = z
     .object({
@@ -27,6 +29,7 @@ export namespace Agent {
         })
         .optional(),
       prompt: z.string().optional(),
+      promptMode: z.enum(["append", "replace"]).optional(),
       tools: z.record(z.boolean()),
       options: z.record(z.string(), z.any()),
     })
@@ -59,6 +62,7 @@ export namespace Agent {
         permission: agentPermission,
         mode: "subagent",
       },
+
       build: {
         name: "build",
         tools: {},
@@ -74,6 +78,25 @@ export namespace Agent {
           write: false,
           edit: false,
           patch: false,
+        },
+        mode: "primary",
+      },
+      research: {
+        name: "research",
+        prompt: PROMPT_RESEARCH,
+        promptMode: "append",
+        tools: {
+          write: false,
+          edit: false,
+          patch: false,
+        },
+        options: {},
+        permission: {
+          edit: "deny",
+          bash: {
+            "*": "allow",
+          },
+          webfetch: "allow",
         },
         mode: "primary",
       },
