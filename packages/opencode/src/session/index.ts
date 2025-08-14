@@ -1,4 +1,5 @@
 import path from "path"
+import { spawn } from "child_process"
 import { Decimal } from "decimal.js"
 import { z, ZodSchema } from "zod"
 import {
@@ -43,6 +44,8 @@ import { Plugin } from "../plugin"
 import { Agent } from "../agent/agent"
 import { Permission } from "../permission"
 import { Wildcard } from "../util/wildcard"
+import { ulid } from "ulid"
+import { defer } from "../util/defer"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
@@ -598,6 +601,7 @@ export namespace Session {
                     abort: new AbortController().signal,
                     agent: input.agent!,
                     messageID: userMsg.id,
+                    extra: { bypassCwdCheck: true },
                     metadata: async () => {},
                   }),
                 )
@@ -740,7 +744,7 @@ export namespace Session {
     const lastSummary = msgs.findLast((msg) => msg.info.role === "assistant" && msg.info.summary === true)
     if (lastSummary) msgs = msgs.filter((msg) => msg.info.id >= lastSummary.info.id)
 
-    if (msgs.length === 1 && !session.parentID && isDefaultTitle(session.title)) {
+    if (msgs.filter((m) => m.info.role === "user").length === 1 && !session.parentID && isDefaultTitle(session.title)) {
       const small = (await Provider.getSmallModel(input.providerID)) ?? model
       generateText({
         maxOutputTokens: small.info.reasoning ? 1024 : 20,
@@ -833,6 +837,11 @@ export namespace Session {
       sessionID: input.sessionID,
     }
     await updateMessage(assistantMsg)
+    await using _ = defer(async () => {
+      if (assistantMsg.time.completed) return
+      await Storage.remove(`session/message/${input.sessionID}/${assistantMsg.id}`)
+      await Bus.publish(MessageV2.Event.Removed, { sessionID: input.sessionID, messageID: assistantMsg.id })
+    })
     const tools: Record<string, AITool> = {}
 
     const processor = createProcessor(assistantMsg, model.info)
@@ -1081,7 +1090,7 @@ export namespace Session {
             content: x,
           }),
         ),
-        ...MessageV2.toModelMessage(msgs),
+        ...MessageV2.toModelMessage(msgs.filter((m) => !(m.info.role === "assistant" && m.info.error))),
       ],
       tools: model.info.tool_call === false ? undefined : tools,
       model: wrapLanguageModel({
@@ -1111,6 +1120,128 @@ export namespace Session {
     }
     state().queued.delete(input.sessionID)
     return result
+  }
+
+  export const CommandInput = z.object({
+    sessionID: Identifier.schema("session"),
+    agent: z.string(),
+    command: z.string(),
+  })
+  export type CommandInput = z.infer<typeof CommandInput>
+  export async function shell(input: CommandInput) {
+    using abort = lock(input.sessionID)
+    const msg: MessageV2.Assistant = {
+      id: Identifier.ascending("message"),
+      sessionID: input.sessionID,
+      system: [],
+      mode: input.agent,
+      cost: 0,
+      path: {
+        cwd: App.info().path.cwd,
+        root: App.info().path.root,
+      },
+      time: {
+        created: Date.now(),
+      },
+      role: "assistant",
+      tokens: {
+        input: 0,
+        output: 0,
+        reasoning: 0,
+        cache: { read: 0, write: 0 },
+      },
+      modelID: "",
+      providerID: "",
+    }
+    await updateMessage(msg)
+    const part: MessageV2.Part = {
+      type: "tool",
+      id: Identifier.ascending("part"),
+      messageID: msg.id,
+      sessionID: input.sessionID,
+      tool: "bash",
+      callID: ulid(),
+      state: {
+        status: "running",
+        time: {
+          start: Date.now(),
+        },
+        input: {
+          command: input.command,
+        },
+      },
+    }
+    await updatePart(part)
+    const app = App.info()
+    const script = `
+     [[ -f ~/.zshrc ]] && source ~/.zshrc >/dev/null 2>&1 || true
+     [[ -f ~/.bashrc ]] && source ~/.bashrc >/dev/null 2>&1 || true
+     eval "${input.command}"
+   `
+    const shell = process.env["SHELL"] ?? "bash"
+    const isFish = shell.includes("fish")
+    const args = isFish
+      ? ["-c", script] // fish with just -c
+      : ["-c", "-l", script]
+
+    const proc = spawn(shell, args, {
+      cwd: app.path.cwd,
+      signal: abort.signal,
+      env: {
+        ...process.env,
+        TERM: "dumb",
+      },
+    })
+
+    let output = ""
+
+    proc.stdout?.on("data", (chunk) => {
+      output += chunk.toString()
+      if (part.state.status === "running") {
+        part.state.metadata = {
+          output: output,
+          description: "",
+        }
+        updatePart(part)
+      }
+    })
+
+    proc.stderr?.on("data", (chunk) => {
+      output += chunk.toString()
+      if (part.state.status === "running") {
+        part.state.metadata = {
+          output: output,
+          description: "",
+        }
+        updatePart(part)
+      }
+    })
+
+    await new Promise<void>((resolve) => {
+      proc.on("close", () => {
+        resolve()
+      })
+    })
+    msg.time.completed = Date.now()
+    await updateMessage(msg)
+    if (part.state.status === "running") {
+      part.state = {
+        status: "completed",
+        time: {
+          ...part.state.time,
+          end: Date.now(),
+        },
+        input: part.state.input,
+        title: "",
+        metadata: {
+          output,
+          description: "",
+        },
+        output,
+      }
+      await updatePart(part)
+    }
+    return { info: msg, parts: [part] }
   }
 
   function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model) {

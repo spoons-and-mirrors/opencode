@@ -22,6 +22,7 @@ import { lazy } from "../util/lazy"
 import { Agent } from "../agent/agent"
 import { ToolRegistry } from "../tool/registry"
 import { MCP } from "../mcp"
+import { Auth } from "../auth"
 
 const ERRORS = {
   400: {
@@ -90,7 +91,7 @@ export namespace Server {
               version: "0.0.3",
               description: "opencode api",
             },
-            openapi: "3.0.0",
+            openapi: "3.1.1",
           },
         }),
       )
@@ -591,6 +592,36 @@ export namespace Server {
           const sessionID = c.req.valid("param").id
           const body = c.req.valid("json")
           const msg = await Session.chat({ ...body, sessionID })
+          return c.json(msg)
+        },
+      )
+      .post(
+        "/session/:id/shell",
+        describeRoute({
+          description: "Run a shell command",
+          operationId: "session.shell",
+          responses: {
+            200: {
+              description: "Created message",
+              content: {
+                "application/json": {
+                  schema: resolver(MessageV2.Assistant),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Session ID" }),
+          }),
+        ),
+        zValidator("json", Session.CommandInput.omit({ sessionID: true })),
+        async (c) => {
+          const sessionID = c.req.valid("param").id
+          const body = c.req.valid("json")
+          const msg = await Session.shell({ ...body, sessionID })
           return c.json(msg)
         },
       )
@@ -1197,6 +1228,37 @@ export namespace Server {
         async (c) => c.json(await callTui(c)),
       )
       .route("/tui/control", TuiRoute)
+      .put(
+        "/auth/:id",
+        describeRoute({
+          description: "Set authentication credentials",
+          operationId: "auth.set",
+          responses: {
+            200: {
+              description: "Successfully set authentication credentials",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+            ...ERRORS,
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        zValidator("json", Auth.Info),
+        async (c) => {
+          const id = c.req.valid("param").id
+          const info = c.req.valid("json")
+          await Auth.set(id, info)
+          return c.json(true)
+        },
+      )
 
     return result
   })
@@ -1210,7 +1272,7 @@ export namespace Server {
           version: "1.0.0",
           description: "opencode api",
         },
-        openapi: "3.0.0",
+        openapi: "3.1.1",
       },
     })
     return result

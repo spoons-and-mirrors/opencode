@@ -183,6 +183,8 @@ func renderContentBlock(
 		if renderer.borderRight {
 			style = style.BorderRightForeground(borderColor)
 		}
+	} else {
+		style = style.PaddingLeft(renderer.paddingLeft + 1).PaddingRight(renderer.paddingRight + 1)
 	}
 
 	content = style.Render(content)
@@ -685,6 +687,8 @@ func renderToolDetails(
 
 func renderToolName(name string) string {
 	switch name {
+	case "bash":
+		return "Shell"
 	case "webfetch":
 		return "Fetch"
 	case "invalid":

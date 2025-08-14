@@ -203,6 +203,11 @@ func (m *messagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Properties.Part.SessionID == m.app.Session.ID {
 			cmds = append(cmds, m.renderView())
 		}
+	case opencode.EventListResponseEventMessageRemoved:
+		if msg.Properties.SessionID == m.app.Session.ID {
+			m.cache.Clear()
+			cmds = append(cmds, m.renderView())
+		}
 	case opencode.EventListResponseEventMessagePartRemoved:
 		if msg.Properties.SessionID == m.app.Session.ID {
 			// Clear the cache when a part is removed to ensure proper re-rendering
@@ -386,12 +391,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 								fileParts,
 								agentParts,
 							)
-							content = lipgloss.PlaceHorizontal(
-								m.width,
-								lipgloss.Center,
-								content,
-								styles.WhitespaceStyle(t.Background()),
-							)
 							m.cache.Set(key, content)
 						}
 						if content != "" {
@@ -468,12 +467,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 									[]opencode.AgentPart{},
 									toolCallParts...,
 								)
-								content = lipgloss.PlaceHorizontal(
-									m.width,
-									lipgloss.Center,
-									content,
-									styles.WhitespaceStyle(t.Background()),
-								)
 								m.cache.Set(key, content)
 							}
 						} else {
@@ -489,12 +482,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 								[]opencode.FilePart{},
 								[]opencode.AgentPart{},
 								toolCallParts...,
-							)
-							content = lipgloss.PlaceHorizontal(
-								m.width,
-								lipgloss.Center,
-								content,
-								styles.WhitespaceStyle(t.Background()),
 							)
 						}
 						if content != "" {
@@ -536,12 +523,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 									permission,
 									width,
 								)
-								content = lipgloss.PlaceHorizontal(
-									m.width,
-									lipgloss.Center,
-									content,
-									styles.WhitespaceStyle(t.Background()),
-								)
 								m.cache.Set(key, content)
 							}
 						} else {
@@ -551,12 +532,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 								part,
 								permission,
 								width,
-							)
-							content = lipgloss.PlaceHorizontal(
-								m.width,
-								lipgloss.Center,
-								content,
-								styles.WhitespaceStyle(t.Background()),
 							)
 						}
 						if content != "" {
@@ -585,12 +560,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 								true,
 								[]opencode.FilePart{},
 								[]opencode.AgentPart{},
-							)
-							content = lipgloss.PlaceHorizontal(
-								m.width,
-								lipgloss.Center,
-								content,
-								styles.WhitespaceStyle(t.Background()),
 							)
 							partCount++
 							lineCount += lipgloss.Height(content) + 1
@@ -625,12 +594,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 						[]opencode.FilePart{},
 						[]opencode.AgentPart{},
 					)
-					content = lipgloss.PlaceHorizontal(
-						m.width,
-						lipgloss.Center,
-						content,
-						styles.WhitespaceStyle(t.Background()),
-					)
 					partCount++
 					lineCount += lipgloss.Height(content) + 1
 					blocks = append(blocks, content)
@@ -644,12 +607,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 					error,
 					width,
 					WithBorderColor(t.Error()),
-				)
-				error = lipgloss.PlaceHorizontal(
-					m.width,
-					lipgloss.Center,
-					error,
-					styles.WhitespaceStyle(t.Background()),
 				)
 				blocks = append(blocks, error)
 				lineCount += lipgloss.Height(error) + 1
@@ -741,12 +698,6 @@ func (m *messagesComponent) renderView() tea.Cmd {
 							part.AsUnion().(opencode.ToolPart),
 							m.app.CurrentPermission,
 							width,
-						)
-						content = lipgloss.PlaceHorizontal(
-							m.width,
-							lipgloss.Center,
-							content,
-							styles.WhitespaceStyle(t.Background()),
 						)
 						if content != "" {
 							partCount++
@@ -916,12 +867,6 @@ func (m *messagesComponent) renderHeader() string {
 		BorderForeground(t.BackgroundElement()).
 		BorderStyle(lipgloss.ThickBorder()).
 		Render(header)
-	header = lipgloss.PlaceHorizontal(
-		m.width,
-		lipgloss.Center,
-		header,
-		styles.WhitespaceStyle(t.Background()),
-	)
 
 	return "\n" + header + "\n"
 }
@@ -1213,7 +1158,7 @@ func NewMessagesComponent(app *app.App) MessagesComponent {
 	if app.State.ScrollSpeed != nil && *app.State.ScrollSpeed > 0 {
 		vp.MouseWheelDelta = *app.State.ScrollSpeed
 	} else {
-		vp.MouseWheelDelta = 4
+		vp.MouseWheelDelta = 2
 	}
 
 	// Default to showing tool details, hidden thinking blocks

@@ -124,6 +124,8 @@ resources:
       message: get /session/{id}/message/{messageID}
       messages: get /session/{id}/message
       chat: post /session/{id}/message
+      shell: post /session/{id}/shell
+      update: patch /session/{id}
       revert: post /session/{id}/revert
       unrevert: post /session/{id}/unrevert
 
