@@ -72,6 +72,21 @@ func NewAgentToggleResourceItem(name, mode string, enabled, defaultEnabled bool)
 	}
 }
 
+// NewUtilsResourceItem creates a ResourceItem for utils
+func NewUtilsResourceItem(name string, enabled, defaultEnabled bool) ResourceItem {
+	return ResourceItem{
+		Name:           name,
+		DisplayName:    name,
+		Type:           "utils",
+		Source:         "builtin",
+		Enabled:        enabled,
+		DefaultEnabled: defaultEnabled,
+		Overridden:     enabled != defaultEnabled,
+		IsSelectable:   true,
+		IsToggleMode:   true,
+	}
+}
+
 func (r ResourceItem) Render(selected bool, width int, baseStyle styles.Style) string {
 	theme := theme.CurrentTheme()
 

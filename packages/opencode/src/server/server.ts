@@ -729,6 +729,7 @@ export namespace Server {
                       z.object({
                         tools: z.record(z.string(), z.boolean()).default({}),
                         agents: z.record(z.string(), z.boolean()).default({}),
+                        utils: z.record(z.string(), z.boolean()).default({}),
                       }),
                     ),
                   ),
@@ -777,12 +778,13 @@ export namespace Server {
           z.object({
             tools: z.record(z.string(), z.boolean()).optional(),
             agents: z.record(z.string(), z.boolean()).optional(),
+            utils: z.record(z.string(), z.boolean()).optional(),
           }),
         ),
         async (c) => {
           const { id: sessionID, agent } = c.req.valid("param")
-          const { tools, agents } = c.req.valid("json")
-          await Session.setOverrides(sessionID, agent, { tools, agents })
+          const { tools, agents, utils } = c.req.valid("json")
+          await Session.setOverrides(sessionID, agent, { tools, agents, utils })
           return c.json(true)
         },
       )

@@ -182,7 +182,15 @@ func (d *resourceDialog) emitUpdateMessage(item ResourceItem) tea.Cmd {
 				overrides[res.Name] = res.Enabled
 			}
 		}
-		return util.CmdHandler(app.ToolsUpdatedMsg{Agent: agent.Name, Overrides: overrides})
+		return util.CmdHandler(app.ResourceUpdatedMsg{Agent: agent.Name, ResourceType: "tools", Overrides: overrides})
+	} else if item.Type == "utils" {
+		overrides := make(map[string]bool)
+		for _, res := range d.allResources {
+			if res.Type == "utils" && res.Overridden {
+				overrides[res.Name] = res.Enabled
+			}
+		}
+		return util.CmdHandler(app.ResourceUpdatedMsg{Agent: agent.Name, ResourceType: "utils", Overrides: overrides})
 	} else {
 		overrides := make(map[string]bool)
 		for _, res := range d.allResources {
@@ -190,7 +198,8 @@ func (d *resourceDialog) emitUpdateMessage(item ResourceItem) tea.Cmd {
 				overrides[res.Name] = res.Enabled
 			}
 		}
-		return util.CmdHandler(app.AgentsUpdatedMsg{Overrides: overrides})
+		// For subagents, use current agent name (not the resource agent name)
+		return util.CmdHandler(app.ResourceUpdatedMsg{Agent: agent.Name, ResourceType: "agents", Overrides: overrides})
 	}
 }
 
@@ -257,7 +266,7 @@ func (d *resourceDialog) setupToolResources(ctx context.Context, agent *opencode
 		}...)
 	} else {
 
-		toolOverrides := d.app.GetSessionToolOverrides(agent.Name)
+		toolOverrides := d.app.GetSessionOverrides(agent.Name, "tool")
 
 		// Build tool items with current state
 		toolKeys := make([]string, 0, len(availableTools))
@@ -295,7 +304,7 @@ func (d *resourceDialog) setupToolResources(ctx context.Context, agent *opencode
 		}...)
 	} else {
 
-		agentOverrides := d.app.GetSessionSubagentOverrides(agent.Name)
+		agentOverrides := d.app.GetSessionOverrides(agent.Name, "agent")
 
 		// Add subagents as toggles
 		for _, agentInfo := range availableAgents {
@@ -314,6 +323,20 @@ func (d *resourceDialog) setupToolResources(ctx context.Context, agent *opencode
 			))
 		}
 	}
+
+	// Add utils section (for auto-compact toggle, etc.)
+	utilsOverrides := d.app.GetSessionOverrides(agent.Name, "utils")
+
+	// Auto-compact setting
+	autoCompactDefault := true // auto-compact is enabled by default
+	autoCompactEnabled := autoCompactDefault
+	if override, exists := utilsOverrides["auto compact"]; exists {
+		autoCompactEnabled = override
+	}
+
+	d.allResources = append(d.allResources, NewUtilsResourceItem(
+		"auto compact", autoCompactEnabled, autoCompactDefault,
+	))
 
 }
 
@@ -362,12 +385,13 @@ func (d *resourceDialog) buildGroupedItems() []list.Item {
 	var items []list.Item
 
 	if d.resourceType == "tool" {
-		// Group by source/type with proper ordering: builtin tools, mcp tools, then agents
+		// Group by source/type with proper ordering: builtin tools, mcp tools, subagents, then utils
 
 		// 1. Built-in Tools
 		builtinTools := make([]ResourceItem, 0)
 		mcpTools := make([]ResourceItem, 0)
 		agents := make([]ResourceItem, 0)
+		utils := make([]ResourceItem, 0)
 
 		for _, res := range d.allResources {
 			switch {
@@ -377,6 +401,8 @@ func (d *resourceDialog) buildGroupedItems() []list.Item {
 				mcpTools = append(mcpTools, res)
 			case res.Type == "agent":
 				agents = append(agents, res)
+			case res.Type == "utils":
+				utils = append(utils, res)
 			}
 		}
 
@@ -389,6 +415,9 @@ func (d *resourceDialog) buildGroupedItems() []list.Item {
 		})
 		sort.Slice(agents, func(i, j int) bool {
 			return agents[i].Name < agents[j].Name
+		})
+		sort.Slice(utils, func(i, j int) bool {
+			return utils[i].Name < utils[j].Name
 		})
 
 		// Add groups in order with headers
@@ -410,6 +439,13 @@ func (d *resourceDialog) buildGroupedItems() []list.Item {
 			items = append(items, list.HeaderItem("Subagents"))
 			for _, agent := range agents {
 				items = append(items, agent)
+			}
+		}
+
+		if len(utils) > 0 {
+			items = append(items, list.HeaderItem("Utilities"))
+			for _, util := range utils {
+				items = append(items, util)
 			}
 		}
 	} else {
@@ -444,6 +480,8 @@ func (d *resourceDialog) buildSearchItems(query string) []list.Item {
 				categoryName = "mcp tools"
 			case res.Type == "agent":
 				categoryName = "subagents agents"
+			case res.Type == "utils":
+				categoryName = "utils utilities"
 			}
 
 			if fuzzy.MatchFold(query, categoryName) || fuzzy.MatchFold(query, res.Source) {
@@ -497,8 +535,10 @@ func getResourceOrder(res ResourceItem) int {
 		return 2
 	case res.Type == "agent":
 		return 3
-	default:
+	case res.Type == "utils":
 		return 4
+	default:
+		return 5
 	}
 }
 

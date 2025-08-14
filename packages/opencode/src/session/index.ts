@@ -148,6 +148,7 @@ export namespace Session {
       >()
       const subagentOverrides = new Map<string, Record<string, Record<string, boolean>>>()
       const toolOverrides = new Map<string, Record<string, Record<string, boolean>>>()
+      const utilsOverrides = new Map<string, Record<string, Record<string, boolean>>>()
 
       return {
         sessions,
@@ -157,6 +158,7 @@ export namespace Session {
         queued,
         subagentOverrides,
         toolOverrides,
+        utilsOverrides,
       }
     },
     async (state) => {
@@ -167,12 +169,13 @@ export namespace Session {
   )
 
   type OverridesMap = Record<string, Record<string, boolean>>
-  type Overrides = { tools: Record<string, boolean>; agents: Record<string, boolean> }
+  type Overrides = { tools: Record<string, boolean>; agents: Record<string, boolean>; utils: Record<string, boolean> }
 
   async function persistOverrides(sessionID: string) {
     const tools = state().toolOverrides.get(sessionID) ?? {}
     const agents = state().subagentOverrides.get(sessionID) ?? {}
-    await Storage.writeJSON("session/overrides/" + sessionID, { tools, agents })
+    const utils = state().utilsOverrides.get(sessionID) ?? {}
+    await Storage.writeJSON("session/overrides/" + sessionID, { tools, agents, utils })
   }
 
   export async function setOverrides(sessionID: string, agentName: string, input: Partial<Overrides>) {
@@ -186,30 +189,39 @@ export namespace Session {
       agents[agentName] = input.agents
       state().subagentOverrides.set(sessionID, agents)
     }
+    if (input.utils) {
+      const utils: OverridesMap = state().utilsOverrides.get(sessionID) ?? {}
+      utils[agentName] = input.utils
+      state().utilsOverrides.set(sessionID, utils)
+    }
     await persistOverrides(sessionID)
   }
 
   export function getOverrides(sessionID: string, agentName: string): Overrides {
     const toolsAll = state().toolOverrides.get(sessionID) ?? {}
     const agentsAll = state().subagentOverrides.get(sessionID) ?? {}
+    const utilsAll = state().utilsOverrides.get(sessionID) ?? {}
     return {
       tools: toolsAll[agentName] ?? {},
       agents: agentsAll[agentName] ?? {},
+      utils: utilsAll[agentName] ?? {},
     }
   }
 
   export function getAllOverrides(sessionID: string): Record<string, Overrides> {
     const toolsAll = state().toolOverrides.get(sessionID) ?? {}
     const agentsAll = state().subagentOverrides.get(sessionID) ?? {}
+    const utilsAll = state().utilsOverrides.get(sessionID) ?? {}
 
-    // Get all unique agent names from both tools and agents overrides
-    const allAgentNames = new Set([...Object.keys(toolsAll), ...Object.keys(agentsAll)])
+    // Get all unique agent names from tools, agents, and utils overrides
+    const allAgentNames = new Set([...Object.keys(toolsAll), ...Object.keys(agentsAll), ...Object.keys(utilsAll)])
 
     const result: Record<string, Overrides> = {}
     for (const agentName of allAgentNames) {
       result[agentName] = {
         tools: toolsAll[agentName] ?? {},
         agents: agentsAll[agentName] ?? {},
+        utils: utilsAll[agentName] ?? {},
       }
     }
 
@@ -221,9 +233,11 @@ export namespace Session {
       const overrides = await Storage.readJSON<{
         tools?: OverridesMap
         agents?: OverridesMap
+        utils?: OverridesMap
       }>("session/overrides/" + sessionID)
       state().subagentOverrides.set(sessionID, overrides.agents ?? {})
       state().toolOverrides.set(sessionID, overrides.tools ?? {})
+      state().utilsOverrides.set(sessionID, overrides.utils ?? {})
     } catch {
       // ignore
     }
@@ -402,6 +416,7 @@ export namespace Session {
       state().messages.delete(sessionID)
       state().subagentOverrides.delete(sessionID)
       state().toolOverrides.delete(sessionID)
+      state().utilsOverrides.delete(sessionID)
       if (emitEvent) {
         Bus.publish(Event.Deleted, {
           info: session,
@@ -436,6 +451,7 @@ export namespace Session {
     system: z.string().optional(),
     tools: z.record(z.boolean()).optional(),
     agents: z.record(z.boolean()).optional(),
+    utils: z.record(z.boolean()).optional(),
     parts: z.array(
       z.discriminatedUnion("type", [
         MessageV2.TextPart.omit({
@@ -728,14 +744,20 @@ export namespace Session {
       const tokens =
         previous.tokens.input + previous.tokens.cache.read + previous.tokens.cache.write + previous.tokens.output
       if (model.info.limit.context && tokens > Math.max((model.info.limit.context - outputLimit) * 0.9, 0)) {
-        state().autoCompacting.set(input.sessionID, true)
+        // Check if auto-compact is enabled (default: true)
+        const overrides = getOverrides(input.sessionID, input.agent ?? inputAgent)
+        const autoCompactEnabled = overrides.utils["auto compact"] ?? true
 
-        await summarize({
-          sessionID: input.sessionID,
-          providerID: input.providerID,
-          modelID: input.modelID,
-        })
-        return chat(input)
+        if (autoCompactEnabled) {
+          state().autoCompacting.set(input.sessionID, true)
+
+          await summarize({
+            sessionID: input.sessionID,
+            providerID: input.providerID,
+            modelID: input.modelID,
+          })
+          return chat(input)
+        }
       }
     }
     using abort = lock(input.sessionID)
@@ -851,14 +873,15 @@ export namespace Session {
       mergeDeep(input.tools ?? {}),
     )
 
-    // Store overrides for tools and agents to access, merging with existing ones
+    // Store overrides for tools, agents, and utils to access, merging with existing ones
     if (input.agent) {
       const existing = getOverrides(input.sessionID, input.agent)
       const next = {
         tools: input.tools ? { ...existing.tools, ...input.tools } : undefined,
         agents: input.agents ? { ...existing.agents, ...input.agents } : undefined,
+        utils: input.utils ? { ...existing.utils, ...input.utils } : undefined,
       }
-      if (next.tools || next.agents) await setOverrides(input.sessionID, input.agent, next)
+      if (next.tools || next.agents || next.utils) await setOverrides(input.sessionID, input.agent, next)
     }
 
     for (const item of await ToolRegistry.tools(input.providerID, input.modelID)) {

@@ -629,15 +629,20 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Immediately persist transferred overrides to the server
 		currentAgent := a.app.Agent().Name
-		if toolOverrides := a.app.GetSessionToolOverrides(currentAgent); len(toolOverrides) > 0 {
-			go func() {
-				_ = a.app.SaveSessionToolOverrides(context.Background(), currentAgent, toolOverrides)
-			}()
+
+		// Map TUI internal types to server API types and save all non-empty overrides
+		overrideMap := map[string]string{
+			"tool":  "tools",  // tui: "tool" -> server: "tools"
+			"agent": "agents", // tui: "agent" -> server: "agents"
+			"utils": "utils",  // tui: "utils" -> server: "utils"
 		}
-		if agentOverrides := a.app.GetSessionSubagentOverrides(currentAgent); len(agentOverrides) > 0 {
-			go func() {
-				_ = a.app.SaveSessionSubagentOverrides(context.Background(), currentAgent, agentOverrides)
-			}()
+
+		for internalType, serverType := range overrideMap {
+			if overrides := a.app.GetSessionOverrides(currentAgent, internalType); len(overrides) > 0 {
+				go func(serverType string, overrides map[string]bool) {
+					_ = a.app.SaveSessionOverrides(context.Background(), currentAgent, serverType, overrides)
+				}(serverType, overrides)
+			}
 		}
 
 		a.app.Session = msg.Session
@@ -684,36 +689,36 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		cmds = append(cmds, a.app.SaveState())
-	case app.ToolsUpdatedMsg:
+	case app.ResourceUpdatedMsg:
+		// Map from plural server API types to singular TUI internal types
+		internalType := map[string]string{
+			"tools":  "tool",
+			"agents": "agent",
+			"utils":  "utils",
+		}[msg.ResourceType]
+
+		// Get the display name for user feedback
+		displayName := map[string]string{
+			"tools":  "Tools",
+			"agents": "Subagents",
+			"utils":  "Utils",
+		}[msg.ResourceType]
+
 		if a.app.HasActiveSession() {
 			// Update session-specific overrides (in-memory)
-			a.app.SetSessionToolOverrides(msg.Agent, msg.Overrides)
+			a.app.SetSessionOverrides(msg.Agent, internalType, msg.Overrides)
 			// Send to server for persistence across sessions
 			cmds = append(cmds, func() tea.Msg {
-				if err := a.app.SaveSessionToolOverrides(context.Background(), msg.Agent, msg.Overrides); err != nil {
-					return toast.NewErrorToast("Failed to save tool settings")()
+				if err := a.app.SaveSessionOverrides(context.Background(), msg.Agent, msg.ResourceType, msg.Overrides); err != nil {
+					return toast.NewErrorToast(fmt.Sprintf("Failed to save %s settings", strings.ToLower(displayName)))()
 				}
 				return nil
 			})
-			cmds = append(cmds, toast.NewSuccessToast("Tools updated"))
+			cmds = append(cmds, toast.NewSuccessToast(fmt.Sprintf("%s updated", displayName)))
 		} else {
 			// No active session - just store in memory (no persistence)
-			a.app.SetSessionToolOverrides(msg.Agent, msg.Overrides)
-			cmds = append(cmds, toast.NewSuccessToast("Tools updated"))
-		}
-	case app.AgentsUpdatedMsg:
-		if a.app.HasActiveSession() {
-			a.app.SetSessionSubagentOverrides(a.app.Agent().Name, msg.Overrides)
-			cmds = append(cmds, func() tea.Msg {
-				if err := a.app.SaveSessionSubagentOverrides(context.Background(), a.app.Agent().Name, msg.Overrides); err != nil {
-					return toast.NewErrorToast("Failed to save subagent settings")()
-				}
-				return nil
-			})
-			cmds = append(cmds, toast.NewSuccessToast("Subagents updated"))
-		} else {
-			a.app.SetSessionSubagentOverrides(a.app.Agent().Name, msg.Overrides)
-			cmds = append(cmds, toast.NewSuccessToast("Subagents updated"))
+			a.app.SetSessionOverrides(msg.Agent, internalType, msg.Overrides)
+			cmds = append(cmds, toast.NewSuccessToast(fmt.Sprintf("%s updated", displayName)))
 		}
 	case dialog.ThemeSelectedMsg:
 		a.app.State.Theme = msg.ThemeName
