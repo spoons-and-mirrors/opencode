@@ -385,6 +385,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 								false,
 								fileParts,
 								agentParts,
+								0,
 							)
 							m.cache.Set(key, content)
 						}
@@ -445,8 +446,109 @@ func (m *messagesComponent) renderView() tea.Cmd {
 							}
 						}
 
+						// --- BEGIN PER-TEXTPART TOKEN TRACKING ---
+						var tokensToShow float64 = 0
+						// Calculate incremental tokens specific to this TextPart's position in the message
+						usage := casted.Tokens
+
+						// Find the StepFinishPart that corresponds to this TextPart
+						var currentStepTokens float64 = 0
+						var previousStepTokens float64 = 0
+						stepPartFound := false
+
+						// Look for the next StepFinishPart after this TextPart
+						for i := partIndex + 1; i < len(message.Parts); i++ {
+							if stepPart, ok := message.Parts[i].(opencode.StepFinishPart); ok {
+								currentStepTokens = float64(stepPart.Tokens.Input + stepPart.Tokens.Output + stepPart.Tokens.Reasoning + stepPart.Tokens.Cache.Read + stepPart.Tokens.Cache.Write)
+								stepPartFound = true
+								break
+							}
+						}
+
+						if stepPartFound {
+							// Look for the previous StepFinishPart within this message
+							for i := partIndex - 1; i >= 0; i-- {
+								if stepPart, ok := message.Parts[i].(opencode.StepFinishPart); ok {
+									previousStepTokens = float64(stepPart.Tokens.Input + stepPart.Tokens.Output + stepPart.Tokens.Reasoning + stepPart.Tokens.Cache.Read + stepPart.Tokens.Cache.Write)
+									break
+								}
+							}
+
+							// If no previous StepFinishPart in this message, subtract tokens from all previous messages
+							if previousStepTokens == 0 {
+								// Find current message index
+								currentIndex := -1
+								for i, msg := range m.app.Messages {
+									if prevAssistant, ok := msg.Info.(opencode.AssistantMessage); ok && prevAssistant.ID == casted.ID {
+										currentIndex = i
+										break
+									}
+								}
+
+								// Sum tokens from all previous completed assistant messages
+								if currentIndex > 0 {
+									for i := currentIndex - 1; i >= 0; i-- {
+										if prevMsg, ok := m.app.Messages[i].Info.(opencode.AssistantMessage); ok {
+											prevUsage := prevMsg.Tokens
+											previousStepTokens += float64(prevUsage.Input + prevUsage.Output + prevUsage.Reasoning + prevUsage.Cache.Read + prevUsage.Cache.Write)
+											break // Only subtract the immediately previous message
+										}
+									}
+								}
+							}
+
+							tokensToShow = currentStepTokens - previousStepTokens
+						}
+
+						// Fallback if no StepFinishPart found or calculation doesn't make sense
+						if tokensToShow <= 0 {
+							// Use message-level calculation as fallback
+							currentTotal := float64(usage.Input + usage.Output + usage.Reasoning + usage.Cache.Read + usage.Cache.Write)
+							var previousTotal float64 = 0
+
+							currentIndex := -1
+							for i, msg := range m.app.Messages {
+								if prevAssistant, ok := msg.Info.(opencode.AssistantMessage); ok && prevAssistant.ID == casted.ID {
+									currentIndex = i
+									break
+								}
+							}
+
+							if currentIndex > 0 {
+								for i := currentIndex - 1; i >= 0; i-- {
+									if prevMsg, ok := m.app.Messages[i].Info.(opencode.AssistantMessage); ok {
+										prevUsage := prevMsg.Tokens
+										previousTotal = float64(prevUsage.Input + prevUsage.Output + prevUsage.Reasoning + prevUsage.Cache.Read + prevUsage.Cache.Write)
+										break
+									}
+								}
+							}
+
+							tokensToShow = currentTotal - previousTotal
+							if tokensToShow <= 0 {
+								// Final fallback
+								nonCache := float64(usage.Input + usage.Output + usage.Reasoning)
+								min := float64(usage.Output)
+								if min <= 0 && nonCache > 0 {
+									min = nonCache
+								}
+								if min <= 0 {
+									min = 1
+								}
+								tokensToShow = min
+							}
+						}
+
+						// Override for live updates: hide tokens during streaming
+						if !finished {
+							tokensToShow = 0
+						}
+						// --- END PER-TEXTPART TOKEN TRACKING ---
 						if finished {
-							key := m.cache.GenerateKey(casted.ID, part.Text, width, m.showToolDetails, toolCallParts)
+							// Include completion time and token totals in cache key to bust stale footers
+							completed := casted.Time.Completed
+							tokens := casted.Tokens.Input + casted.Tokens.Output + casted.Tokens.Reasoning + casted.Tokens.Cache.Read + casted.Tokens.Cache.Write
+							key := m.cache.GenerateKey(casted.ID, part.Text, width, m.showToolDetails, toolCallParts, completed, tokens)
 							content, cached = m.cache.Get(key)
 							if !cached {
 								content = renderText(
@@ -460,11 +562,13 @@ func (m *messagesComponent) renderView() tea.Cmd {
 									false,
 									[]opencode.FilePart{},
 									[]opencode.AgentPart{},
+									tokensToShow,
 									toolCallParts...,
 								)
 								m.cache.Set(key, content)
 							}
 						} else {
+							// Hide live updates during streaming - don't show token count
 							content = renderText(
 								m.app,
 								message.Info,
@@ -476,6 +580,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 								false,
 								[]opencode.FilePart{},
 								[]opencode.AgentPart{},
+								0, // Pass 0 to hide token count during streaming
 								toolCallParts...,
 							)
 						}
@@ -543,11 +648,10 @@ func (m *messagesComponent) renderView() tea.Cmd {
 							continue
 						}
 						if part.Text != "" {
-							text := part.Text
 							content = renderText(
 								m.app,
 								message.Info,
-								text,
+								part.Text,
 								casted.ModelID,
 								m.showToolDetails,
 								width,
@@ -555,6 +659,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 								true,
 								[]opencode.FilePart{},
 								[]opencode.AgentPart{},
+								0,
 							)
 							partCount++
 							lineCount += lipgloss.Height(content) + 1
@@ -588,6 +693,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 						false,
 						[]opencode.FilePart{},
 						[]opencode.AgentPart{},
+						0,
 					)
 					partCount++
 					lineCount += lipgloss.Height(content) + 1

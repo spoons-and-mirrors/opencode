@@ -202,6 +202,59 @@ func renderContentBlock(
 	return content
 }
 
+func formatTokenCount(tokens float64) string {
+	var tokenInfo string
+	if tokens >= 1_000_000 {
+		tokenInfo = fmt.Sprintf(", %.1fM tokens", tokens/1_000_000)
+		tokenInfo = strings.Replace(tokenInfo, ".0M", "M", 1)
+	} else if tokens >= 1_000 {
+		tokenInfo = fmt.Sprintf(", %.1fK tokens", tokens/1_000)
+		tokenInfo = strings.Replace(tokenInfo, ".0K", "K", 1)
+	} else {
+		tokenInfo = fmt.Sprintf(", %.0f tokens", tokens)
+	}
+	return tokenInfo
+}
+
+func getTokensSinceLastFooter(app *app.App, assistantMsg opencode.AssistantMessage) float64 {
+	usage := assistantMsg.Tokens
+	currentTotal := usage.Input + usage.Output + usage.Reasoning + usage.Cache.Read + usage.Cache.Write
+
+	var previousTotal float64 = 0
+	currentIndex := -1
+	for i, msg := range app.Messages {
+		if prevAssistant, ok := msg.Info.(opencode.AssistantMessage); ok && prevAssistant.ID == assistantMsg.ID {
+			currentIndex = i
+			break
+		}
+	}
+
+	if currentIndex > 0 {
+		for i := currentIndex - 1; i >= 0; i-- {
+			if prevMsg, ok := app.Messages[i].Info.(opencode.AssistantMessage); ok && prevMsg.Time.Completed > 0 {
+				prevUsage := prevMsg.Tokens
+				previousTotal = prevUsage.Input + prevUsage.Output + prevUsage.Reasoning + prevUsage.Cache.Read + prevUsage.Cache.Write
+				break
+			}
+		}
+	}
+
+	tokensSinceLastFooter := currentTotal - previousTotal
+	if tokensSinceLastFooter <= 0 {
+		nonCache := usage.Input + usage.Output + usage.Reasoning
+		min := usage.Output
+		if min <= 0 && nonCache > 0 {
+			min = nonCache
+		}
+		if min <= 0 {
+			min = 1
+		}
+		tokensSinceLastFooter = min
+	}
+
+	return tokensSinceLastFooter
+}
+
 func renderText(
 	app *app.App,
 	message opencode.MessageUnion,
@@ -213,6 +266,7 @@ func renderText(
 	isThinking bool,
 	fileParts []opencode.FilePart,
 	agentParts []opencode.AgentPart,
+	tokensForPart float64,
 	toolCalls ...opencode.ToolPart,
 ) string {
 	t := theme.CurrentTheme()
@@ -339,10 +393,19 @@ func renderText(
 	if time.Now().Format("02 Jan 2006") == timestamp[:11] {
 		timestamp = timestamp[12:]
 	}
+
+	tokenInfo := ""
+	if tokensForPart > 0 {
+		tokenInfo = formatTokenCount(tokensForPart)
+	} else if assistantMsg, ok := message.(opencode.AssistantMessage); ok && assistantMsg.Time.Completed > 0 {
+		tokensSinceLastFooter := getTokensSinceLastFooter(app, assistantMsg)
+		tokenInfo = formatTokenCount(tokensSinceLastFooter)
+	}
+
 	timestamp = styles.NewStyle().
 		Background(backgroundColor).
 		Foreground(t.TextMuted()).
-		Render(" (" + timestamp + ")")
+		Render(" (" + timestamp + tokenInfo + ")")
 
 	// Check if this is an assistant message with agent information
 	var modelAndAgentSuffix string
