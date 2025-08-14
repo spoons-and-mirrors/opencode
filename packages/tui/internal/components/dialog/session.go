@@ -27,6 +27,7 @@ type SessionDialog interface {
 
 // sessionItem is a custom list item for sessions that can show delete confirmation
 type sessionItem struct {
+	id                 string
 	title              string
 	isDeleteConfirming bool
 	isCurrentSession   bool
@@ -200,7 +201,7 @@ func (s *sessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					s.updateListItems()
 					return s, textinput.Blink
 				}
-			case "p":
+			case "b":
 				if session := s.getSelectedSession(); session != nil {
 					newPinnedState := !session.Pinned
 					return s, tea.Sequence(
@@ -302,7 +303,7 @@ func (s *sessionDialog) Render(background string) string {
 	keyStyle := styles.NewStyle().Foreground(t.Warning()).Background(t.BackgroundPanel()).Render
 	mutedStyle := styles.NewStyle().Foreground(t.TextMuted()).Background(t.BackgroundPanel()).Render
 
-	leftHelp := keyStyle("n") + mutedStyle(" new") + "   " + keyStyle("r") + mutedStyle(" rename") + "   " + keyStyle("p") + mutedStyle(" pin") + "   " + keyStyle("tab") + mutedStyle(" bookmarks")
+	leftHelp := keyStyle("n") + mutedStyle(" new") + "   " + keyStyle("r") + mutedStyle(" rename") + "   " + keyStyle("b") + mutedStyle(" bookmark") + "   " + keyStyle("tab") + mutedStyle(" filter")
 	rightHelp := keyStyle("x/del") + mutedStyle(" delete")
 
 	bgColor := t.BackgroundPanel()
@@ -359,9 +360,9 @@ func (s *sessionDialog) getSelectedSession() *opencode.Session {
 		return nil
 	}
 
-	// Find the session by title since we don't store the ID in sessionItem
+	// Find the session by ID
 	for i := range s.sessions {
-		if s.sessions[i].Title == item.title {
+		if s.sessions[i].ID == item.id {
 			return &s.sessions[i]
 		}
 	}
@@ -391,6 +392,7 @@ func (s *sessionDialog) updateListItems() {
 	var items []sessionItem
 	for _, sess := range filtered {
 		item := sessionItem{
+			id:                 sess.ID,
 			title:              sess.Title,
 			isDeleteConfirming: s.confirmID == sess.ID,
 			isCurrentSession:   s.app.Session != nil && s.app.Session.ID == sess.ID,
@@ -449,6 +451,7 @@ func NewSessionDialog(app *app.App) SessionDialog {
 		}
 		filtered = append(filtered, sess)
 		items = append(items, sessionItem{
+			id:                 sess.ID,
 			title:              sess.Title,
 			isDeleteConfirming: false,
 			isCurrentSession:   app.Session != nil && app.Session.ID == sess.ID,
