@@ -50,7 +50,8 @@ func (s sessionItem) Render(
 			prefix = styles.NewStyle().Foreground(t.Success()).Render("● ")
 		}
 		if s.isCurrentSession {
-			text = prefix + "● " + s.title
+			// For current session, only show the current session dot, hide pin dot
+			text = "● " + s.title
 		} else {
 			text = prefix + s.title
 		}
@@ -225,11 +226,12 @@ func (s *sessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						},
 					)
 				}
-			case "P":
+			case "tab":
 				s.pinnedOnly = !s.pinnedOnly
 				if s.pinnedOnly {
 					s.modal.SetTitle("Switch Session (Pinned Only)")
-				} else {
+				}
+				if !s.pinnedOnly {
 					s.modal.SetTitle("Switch Session")
 				}
 				s.updateListItems()
@@ -296,11 +298,12 @@ func (s *sessionDialog) Render(background string) string {
 	listView := s.list.View()
 
 	t := theme.CurrentTheme()
-	keyStyle := styles.NewStyle().Foreground(t.Text()).Background(t.BackgroundPanel()).Render
+	// Use warning color for shortcut keys to make them stand out
+	keyStyle := styles.NewStyle().Foreground(t.Warning()).Background(t.BackgroundPanel()).Render
 	mutedStyle := styles.NewStyle().Foreground(t.TextMuted()).Background(t.BackgroundPanel()).Render
 
-	leftHelp := keyStyle("n") + mutedStyle(" new session") + " " + keyStyle("r") + mutedStyle(" rename") + " " + keyStyle("p") + mutedStyle(" pin") + " " + keyStyle("P") + mutedStyle(" pinned view")
-	rightHelp := keyStyle("x/del") + mutedStyle(" delete session")
+	leftHelp := keyStyle("n") + mutedStyle(" new") + "   " + keyStyle("r") + mutedStyle(" rename") + "   " + keyStyle("p") + mutedStyle(" pin") + "   " + keyStyle("tab") + mutedStyle(" bookmarks")
+	rightHelp := keyStyle("x/del") + mutedStyle(" delete")
 
 	bgColor := t.BackgroundPanel()
 	helpText := layout.Render(layout.FlexOptions{
