@@ -48,7 +48,13 @@ func (s sessionItem) Render(
 	} else {
 		prefix := ""
 		if s.isPinned {
-			prefix = styles.NewStyle().Foreground(t.Success()).Render("● ")
+			if selected {
+				// When selected, use plain text to avoid color conflicts
+				prefix = "● "
+			} else {
+				// When not selected, use Success color for the pin dot
+				prefix = styles.NewStyle().Foreground(t.Success()).Render("● ")
+			}
 		}
 		if s.isCurrentSession {
 			// For current session, only show the current session dot, hide pin dot
