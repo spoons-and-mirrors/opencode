@@ -861,6 +861,7 @@ export namespace Session {
                     )
                     const result = await item.execute(args, {
                       sessionID: input.sessionID,
+                      agent: agent.name,
                       abort: options.abortSignal!,
                       messageID: assistantMsg.id,
                       callID: options.toolCallId,
