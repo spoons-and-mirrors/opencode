@@ -27,7 +27,7 @@ export namespace Agent {
         })
         .optional(),
       prompt: z.string().optional(),
-      promptMode: z.enum(["append", "replace"]).optional(),
+      extend: z.boolean().optional(),
       tools: z.record(z.boolean()),
       options: z.record(z.string(), z.any()),
     })

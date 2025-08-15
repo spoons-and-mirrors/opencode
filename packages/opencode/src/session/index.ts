@@ -726,19 +726,12 @@ export namespace Session {
         synthetic: true,
       })
     }
-    let system: string[] = []
-    if (input.system) {
-      system = [...SystemPrompt.header(input.providerID), input.system]
-    }
-    if (!input.system && agent.prompt && agent.promptMode === "replace") {
-      // Replace default system prompt with agent prompt
-      system = [agent.prompt]
-    }
-    if (!input.system && (!agent.prompt || agent.promptMode !== "replace")) {
-      // Default: append agent prompt if present
-      system = [...SystemPrompt.header(input.providerID)]
-      if (agent.prompt) system.push(agent.prompt)
-    }
+    let system = (() => {
+      if (input.system) return [...SystemPrompt.header(input.providerID), input.system]
+      if (!input.system && agent.prompt && !agent.extend) return [agent.prompt]
+      if (!input.system && agent.prompt && agent.extend) return [...SystemPrompt.header(input.providerID), agent.prompt]
+      return [...SystemPrompt.header(input.providerID), ...SystemPrompt.provider(input.modelID)]
+    })()
     system.push(...(await SystemPrompt.environment()))
     system.push(...(await SystemPrompt.custom()))
     // max 2 system prompt messages for caching purposes
