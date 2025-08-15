@@ -56,11 +56,21 @@ func (s sessionItem) Render(
 				prefix = styles.NewStyle().Foreground(t.Success()).Render("● ")
 			}
 		}
+
+		// Apply normal text color to title for non-selected items
+		var styledTitle string
+		if selected {
+			styledTitle = s.title
+		} else {
+			textStyle := styles.NewStyle().Foreground(t.Text()).Render
+			styledTitle = textStyle(s.title)
+		}
+
 		if s.isCurrentSession {
 			// For current session, only show the current session dot, hide pin dot
-			text = "● " + s.title
+			text = "● " + styledTitle
 		} else {
-			text = prefix + s.title
+			text = prefix + styledTitle
 		}
 	}
 
