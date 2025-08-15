@@ -236,7 +236,7 @@ func (s *sessionDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "tab":
 				s.pinnedOnly = !s.pinnedOnly
 				if s.pinnedOnly {
-					s.modal.SetTitle("Switch Session (Pinned Only)")
+					s.modal.SetTitle("Switch Session (bookmarks)")
 				}
 				if !s.pinnedOnly {
 					s.modal.SetTitle("Switch Session")
