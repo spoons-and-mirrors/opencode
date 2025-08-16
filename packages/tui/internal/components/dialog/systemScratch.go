@@ -97,7 +97,7 @@ func NewSystemScratchDialog(app *app.App) SystemScratchDialog {
 	ta.SetHeight(12)
 	ta.Focus()
 	ta.CharLimit = 5000
-	ta.Placeholder = "Your session scratchpad...\n\nWrite anything here: todos, notes, ideas, system prompt extension etc. This scratchpad persists for the session and is shared with the agent."
+	ta.Placeholder = "Your session scratchpad...\n\nWrite anything here: todos, notes, ideas, system prompt extension etc. This scratchpad is saved with the session and is shared with the agent."
 
 	// Style the textarea
 	ta.Styles.Focused.CursorLine = styles.NewStyle().Background(bgColor).Lipgloss()
