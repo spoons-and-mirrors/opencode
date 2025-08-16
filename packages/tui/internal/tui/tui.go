@@ -684,6 +684,9 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dialog.ThemeSelectedMsg:
 		a.app.State.Theme = msg.ThemeName
 		cmds = append(cmds, a.app.SaveState())
+	case dialog.SystemScratchUpdatedMsg:
+		// Handle scratchpad content updates
+		cmds = append(cmds, a.handleScratchpadUpdate(msg.Content))
 	case toast.ShowToastMsg:
 		tm, cmd := a.toastManager.Update(msg)
 		a.toastManager = tm
@@ -1384,6 +1387,18 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		a.modal = themeDialog
 	case commands.ProjectInitCommand:
 		cmds = append(cmds, a.app.InitializeProject(context.Background()))
+	case commands.SystemScratchOpenCommand:
+		// Load system scratch content from server first
+		var systemScratchContent string
+		if a.app.Session != nil && a.app.Session.ID != "" {
+			a.app.LoadSessionSystemScratch(context.Background())
+			systemScratchContent = a.app.GetSessionSystemScratch()
+		} else {
+			systemScratchContent = a.app.State.HomescreenSystemScratch
+		}
+		systemScratchDialog := dialog.NewSystemScratchDialog(a.app)
+		systemScratchDialog.SetContent(systemScratchContent)
+		a.modal = systemScratchDialog
 	case commands.InputClearCommand:
 		if a.editor.Value() == "" {
 			return a, nil
@@ -1520,4 +1535,17 @@ func formatConversationToMarkdown(messages []app.Message) string {
 	}
 
 	return builder.String()
+}
+
+// handleScratchpadUpdate handles scratchpad content updates by saving to session
+func (a Model) handleScratchpadUpdate(content string) tea.Cmd {
+	return func() tea.Msg {
+		if a.app.Session != nil && a.app.Session.ID != "" {
+			a.app.SaveSessionSystemScratch(content)
+		} else {
+			a.app.State.HomescreenSystemScratch = content
+			a.app.SaveState() // persist homescreen system scratch
+		}
+		return nil
+	}
 }

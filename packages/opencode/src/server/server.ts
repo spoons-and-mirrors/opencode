@@ -751,6 +751,73 @@ export namespace Server {
         },
       )
       .get(
+        "/session/:id/systemScratch",
+        describeRoute({
+          description: "Get session system scratchpad content",
+          operationId: "session.systemScratch.get",
+          responses: {
+            200: {
+              description: "System scratch content",
+              content: {
+                "application/json": {
+                  schema: resolver(z.object({ systemScratch: z.string() })),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Session ID" }),
+          }),
+        ),
+        async (c) => {
+          const sessionID = c.req.valid("param").id
+          const session = await Session.get(sessionID)
+          return c.json({ systemScratch: session?.systemScratch || "" })
+        },
+      )
+      .put(
+        "/session/:id/systemScratch",
+        describeRoute({
+          description: "Update session system scratchpad content",
+          operationId: "session.systemScratch.update",
+          responses: {
+            200: {
+              description: "System scratch updated successfully",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string().openapi({ description: "Session ID" }),
+          }),
+        ),
+        zValidator(
+          "json",
+          z.object({
+            systemScratch: z.string(),
+          }),
+        ),
+        async (c) => {
+          const sessionID = c.req.valid("param").id
+          const { systemScratch } = c.req.valid("json")
+
+          const updatedSession = await Session.update(sessionID, (session) => {
+            session.systemScratch = systemScratch
+          })
+
+          return c.json(updatedSession)
+        },
+      )
+      .get(
         "/config/providers",
         describeRoute({
           description: "List all providers",

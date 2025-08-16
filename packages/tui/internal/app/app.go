@@ -727,9 +727,22 @@ func (a *App) MarkProjectInitialized(ctx context.Context) error {
 }
 
 func (a *App) CreateSession(ctx context.Context) (*opencode.Session, error) {
+	// If there is homescreen system scratch content, transfer it to the new session after creation
+
 	session, err := a.Client.Session.New(ctx, opencode.SessionNewParams{})
 	if err != nil {
 		return nil, err
+	}
+	// Transfer homescreen system scratch content if present
+	if a.State.HomescreenSystemScratch != "" {
+		_, err := a.Client.Session.SystemScratchUpdate(ctx, session.ID, opencode.SessionSystemScratchUpdateParams{
+			SystemScratch: opencode.F(a.State.HomescreenSystemScratch),
+		})
+		if err == nil {
+			session.SystemScratch = a.State.HomescreenSystemScratch
+			a.State.HomescreenSystemScratch = ""
+			a.SaveState()
+		}
 	}
 	return session, nil
 }
@@ -746,18 +759,34 @@ func (a *App) SendPrompt(ctx context.Context, prompt Prompt) (*App, tea.Cmd) {
 	}
 
 	messageID := id.Ascending(id.Message)
-	message := prompt.ToMessage(messageID, a.Session.ID)
 
+	// Create user message (scratchpad content is sent as system message if present)
+	message := prompt.ToMessage(messageID, a.Session.ID)
 	a.Messages = append(a.Messages, message)
 
+	// Prepare system message from scratchpad content if present
+	var systemMessage *string
+	scratchpadContent := a.GetSessionScratchpad()
+	if strings.TrimSpace(scratchpadContent) != "" {
+		systemPrompt := "The user has shared a scratchpad for this session. If it contains a task list, you MUST use the `todowrite` tool to track its items.\n\nUser's scratchpad content:\n" + scratchpadContent + "\n\n---"
+		systemMessage = &systemPrompt
+	}
+
 	cmds = append(cmds, func() tea.Msg {
-		_, err := a.Client.Session.Chat(ctx, a.Session.ID, opencode.SessionChatParams{
+		chatParams := opencode.SessionChatParams{
 			ProviderID: opencode.F(a.Provider.ID),
 			ModelID:    opencode.F(a.Model.ID),
 			Agent:      opencode.F(a.Agent().Name),
 			MessageID:  opencode.F(messageID),
 			Parts:      opencode.F(message.ToSessionChatParams()),
-		})
+		}
+
+		// Add system message if scratchpad content exists
+		if systemMessage != nil {
+			chatParams.System = opencode.F(*systemMessage)
+		}
+
+		_, err := a.Client.Session.Chat(ctx, a.Session.ID, chatParams)
 		if err != nil {
 			errormsg := fmt.Sprintf("failed to send message: %v", err)
 			slog.Error(errormsg)
@@ -847,6 +876,55 @@ func (a *App) UpdateSession(ctx context.Context, sessionID string, title string)
 		slog.Error("Failed to update session", "error", err)
 		return err
 	}
+	return nil
+}
+
+func (a *App) GetSessionSystemScratch() string {
+	if a.Session == nil {
+		return ""
+	}
+	return a.Session.SystemScratch
+}
+
+func (a *App) GetSessionScratchpad() string {
+	if a.Session == nil {
+		return ""
+	}
+	return a.Session.SystemScratch
+}
+
+func (a *App) SaveSessionSystemScratch(content string) error {
+	if a.Session == nil {
+		return fmt.Errorf("no active session")
+	}
+
+	ctx := context.Background()
+	_, err := a.Client.Session.SystemScratchUpdate(ctx, a.Session.ID, opencode.SessionSystemScratchUpdateParams{
+		SystemScratch: opencode.F(content),
+	})
+	if err != nil {
+		slog.Error("Failed to save system scratch", "error", err)
+		return err
+	}
+
+	// Update local session
+	a.Session.SystemScratch = content
+	return nil
+}
+
+func (a *App) LoadSessionSystemScratch(ctx context.Context) error {
+	if a.Session == nil {
+		return fmt.Errorf("no active session")
+	}
+
+	response, err := a.Client.Session.SystemScratchGet(ctx, a.Session.ID)
+	if err != nil {
+		slog.Error("Failed to load system scratch", "error", err)
+		return err
+	}
+
+	// Update local session
+	a.Session.SystemScratch = response.SystemScratch
 	return nil
 }
 

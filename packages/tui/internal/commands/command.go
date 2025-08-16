@@ -107,7 +107,6 @@ func (r CommandRegistry) Matches(msg tea.KeyPressMsg, leader bool) []Command {
 }
 
 const (
-
 	SessionChildCycleCommand        CommandName = "session_child_cycle"
 	SessionChildCycleReverseCommand CommandName = "session_child_cycle_reverse"
 	ModelCycleRecentReverseCommand  CommandName = "model_cycle_recent_reverse"
@@ -122,37 +121,38 @@ const (
 	SessionNavigationCommand        CommandName = "session_navigation"
 	SessionShareCommand             CommandName = "session_share"
 	SessionUnshareCommand           CommandName = "session_unshare"
-	SessionInterruptCommand  	      CommandName = "session_interrupt"
-	SessionCompactCommand     	    CommandName = "session_compact"
-	SessionExportCommand        	  CommandName = "session_export"
-	ToolDetailsCommand            	CommandName = "tool_details"
-	ThinkingBlocksCommand         	CommandName = "thinking_blocks"
-	ModelListCommand              	CommandName = "model_list"
-	AgentListCommand              	CommandName = "agent_list"
-	ModelCycleRecentCommand       	CommandName = "model_cycle_recent"
-	ThemeListCommand              	CommandName = "theme_list"
-	FileListCommand               	CommandName = "file_list"
-	FileCloseCommand              	CommandName = "file_close"
-	FileSearchCommand             	CommandName = "file_search"
-	FileDiffToggleCommand         	CommandName = "file_diff_toggle"
-	ProjectInitCommand            	CommandName = "project_init"
-	InputClearCommand             	CommandName = "input_clear"
-	InputPasteCommand             	CommandName = "input_paste"
-	InputSubmitCommand            	CommandName = "input_submit"
-	InputNewlineCommand           	CommandName = "input_newline"
-	MessagesPageUpCommand        		CommandName = "messages_page_up"
-	MessagesPageDownCommand      		CommandName = "messages_page_down"
-	MessagesHalfPageUpCommand    		CommandName = "messages_half_page_up"
-	MessagesHalfPageDownCommand  		CommandName = "messages_half_page_down"
-	MessagesPreviousCommand       	CommandName = "messages_previous"
-	MessagesNextCommand           	CommandName = "messages_next"
-	MessagesFirstCommand          	CommandName = "messages_first"
-	MessagesLastCommand           	CommandName = "messages_last"
-	MessagesLayoutToggleCommand   	CommandName = "messages_layout_toggle"
-	MessagesCopyCommand           	CommandName = "messages_copy"
-	MessagesUndoCommand           	CommandName = "messages_undo"
-	MessagesRedoCommand           	CommandName = "messages_redo"
-	AppExitCommand                	CommandName = "app_exit"
+	SessionInterruptCommand         CommandName = "session_interrupt"
+	SessionCompactCommand           CommandName = "session_compact"
+	SessionExportCommand            CommandName = "session_export"
+	ToolDetailsCommand              CommandName = "tool_details"
+	ThinkingBlocksCommand           CommandName = "thinking_blocks"
+	ModelListCommand                CommandName = "model_list"
+	AgentListCommand                CommandName = "agent_list"
+	ModelCycleRecentCommand         CommandName = "model_cycle_recent"
+	ThemeListCommand                CommandName = "theme_list"
+	FileListCommand                 CommandName = "file_list"
+	FileCloseCommand                CommandName = "file_close"
+	FileSearchCommand               CommandName = "file_search"
+	FileDiffToggleCommand           CommandName = "file_diff_toggle"
+	ProjectInitCommand              CommandName = "project_init"
+	InputClearCommand               CommandName = "input_clear"
+	InputPasteCommand               CommandName = "input_paste"
+	InputSubmitCommand              CommandName = "input_submit"
+	InputNewlineCommand             CommandName = "input_newline"
+	MessagesPageUpCommand           CommandName = "messages_page_up"
+	MessagesPageDownCommand         CommandName = "messages_page_down"
+	MessagesHalfPageUpCommand       CommandName = "messages_half_page_up"
+	MessagesHalfPageDownCommand     CommandName = "messages_half_page_down"
+	MessagesPreviousCommand         CommandName = "messages_previous"
+	MessagesNextCommand             CommandName = "messages_next"
+	MessagesFirstCommand            CommandName = "messages_first"
+	MessagesLastCommand             CommandName = "messages_last"
+	MessagesLayoutToggleCommand     CommandName = "messages_layout_toggle"
+	MessagesCopyCommand             CommandName = "messages_copy"
+	MessagesUndoCommand             CommandName = "messages_undo"
+	MessagesRedoCommand             CommandName = "messages_redo"
+	SystemScratchOpenCommand        CommandName = "system_scratch_open"
+	AppExitCommand                  CommandName = "app_exit"
 )
 
 func (k Command) Matches(msg tea.KeyPressMsg, leader bool) bool {
@@ -308,6 +308,12 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Description: "create/update AGENTS.md",
 			Keybindings: parseBindings("<leader>i"),
 			Trigger:     []string{"init"},
+		},
+		{
+			Name:        SystemScratchOpenCommand,
+			Description: "open session system scratch pad",
+			Keybindings: parseBindings("<leader>w"),
+			Trigger:     []string{"scratchpad", "notes", "scratch", "pad"},
 		},
 		{
 			Name:        InputClearCommand,

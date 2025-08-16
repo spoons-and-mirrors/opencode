@@ -27,16 +27,17 @@ type AgentModel struct {
 }
 
 type State struct {
-	Theme              string                `toml:"theme"`
-	AgentModel         map[string]AgentModel `toml:"agent_model"`
-	Provider           string                `toml:"provider"`
-	Model              string                `toml:"model"`
-	Agent              string                `toml:"agent"`
-	RecentlyUsedModels []ModelUsage          `toml:"recently_used_models"`
-	RecentlyUsedAgents []AgentUsage          `toml:"recently_used_agents"`
-	MessageHistory     []Prompt              `toml:"message_history"`
-	ShowToolDetails    *bool                 `toml:"show_tool_details"`
-	ShowThinkingBlocks *bool                 `toml:"show_thinking_blocks"`
+	HomescreenSystemScratch string                `toml:"homescreen_system_scratch"` // persists system scratch when no session is active
+	Theme                   string                `toml:"theme"`
+	AgentModel              map[string]AgentModel `toml:"agent_model"`
+	Provider                string                `toml:"provider"`
+	Model                   string                `toml:"model"`
+	Agent                   string                `toml:"agent"`
+	RecentlyUsedModels      []ModelUsage          `toml:"recently_used_models"`
+	RecentlyUsedAgents      []AgentUsage          `toml:"recently_used_agents"`
+	MessageHistory          []Prompt              `toml:"message_history"`
+	ShowToolDetails         *bool                 `toml:"show_tool_details"`
+	ShowThinkingBlocks      *bool                 `toml:"show_thinking_blocks"`
 }
 
 func NewState() *State {

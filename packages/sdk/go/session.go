@@ -238,6 +238,30 @@ func (r *SessionService) Unshare(ctx context.Context, id string, opts ...option.
 	return
 }
 
+// Get session system scratch content
+func (r *SessionService) SystemScratchGet(ctx context.Context, id string, opts ...option.RequestOption) (res *SessionSystemScratchGetResponse, err error) {
+	opts = append(r.Options[:], opts...)
+	if id == "" {
+		err = errors.New("missing required id parameter")
+		return
+	}
+	path := fmt.Sprintf("session/%s/systemScratch", id)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &res, opts...)
+	return
+}
+
+// Update session system scratch content
+func (r *SessionService) SystemScratchUpdate(ctx context.Context, id string, body SessionSystemScratchUpdateParams, opts ...option.RequestOption) (res *Session, err error) {
+	opts = append(r.Options[:], opts...)
+	if id == "" {
+		err = errors.New("missing required id parameter")
+		return
+	}
+	path := fmt.Sprintf("session/%s/systemScratch", id)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPut, path, body, &res, opts...)
+	return
+}
+
 type AgentPart struct {
 	ID        string          `json:"id,required"`
 	MessageID string          `json:"messageID,required"`
@@ -1282,14 +1306,15 @@ func (r ReasoningPartType) IsKnown() bool {
 }
 
 type Session struct {
-	ID       string        `json:"id,required"`
-	Time     SessionTime   `json:"time,required"`
-	Title    string        `json:"title,required"`
-	Version  string        `json:"version,required"`
-	ParentID string        `json:"parentID"`
-	Revert   SessionRevert `json:"revert"`
-	Share    SessionShare  `json:"share"`
-	JSON     sessionJSON   `json:"-"`
+	ID            string        `json:"id,required"`
+	Time          SessionTime   `json:"time,required"`
+	Title         string        `json:"title,required"`
+	Version       string        `json:"version,required"`
+	SystemScratch string        `json:"systemScratch"`
+	ParentID      string        `json:"parentID"`
+	Revert        SessionRevert `json:"revert"`
+	Share         SessionShare  `json:"share"`
+	JSON          sessionJSON   `json:"-"`
 }
 
 // sessionJSON contains the JSON metadata for the struct [Session]
@@ -2430,5 +2455,36 @@ type SessionSummarizeParams struct {
 }
 
 func (r SessionSummarizeParams) MarshalJSON() (data []byte, err error) {
+	return apijson.MarshalRoot(r)
+}
+
+type SessionSystemScratchGetResponse struct {
+	SystemScratch string                              `json:"systemScratch,required"`
+	JSON          sessionSystemScratchGetResponseJSON `json:"-"`
+}
+
+type sessionSystemScratchGetResponseJSON struct {
+	SystemScratch apijson.Field
+	raw           string
+	ExtraFields   map[string]apijson.Field
+}
+
+func (r sessionSystemScratchGetResponseJSON) RawJSON() string {
+	return r.raw
+}
+
+func (r *SessionSystemScratchGetResponse) UnmarshalJSON(data []byte) (err error) {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+func (r sessionSystemScratchGetResponseJSON) MarshalJSON() (data []byte, err error) {
+	return apijson.MarshalRoot(r)
+}
+
+type SessionSystemScratchUpdateParams struct {
+	SystemScratch param.Field[string] `json:"systemScratch,required"`
+}
+
+func (r SessionSystemScratchUpdateParams) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
 }
