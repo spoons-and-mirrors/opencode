@@ -238,26 +238,26 @@ func (r *SessionService) Unshare(ctx context.Context, id string, opts ...option.
 	return
 }
 
-// Get session system scratch content
-func (r *SessionService) SystemScratchGet(ctx context.Context, id string, opts ...option.RequestOption) (res *SessionSystemScratchGetResponse, err error) {
+// Get session scratchpad content
+func (r *SessionService) ScratchpadGet(ctx context.Context, id string, opts ...option.RequestOption) (res *SessionScratchpadGetResponse, err error) {
 	opts = append(r.Options[:], opts...)
 	if id == "" {
 		err = errors.New("missing required id parameter")
 		return
 	}
-	path := fmt.Sprintf("session/%s/systemScratch", id)
+	path := fmt.Sprintf("session/%s/scratchpad", id)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &res, opts...)
 	return
 }
 
 // Update session system scratch content
-func (r *SessionService) SystemScratchUpdate(ctx context.Context, id string, body SessionSystemScratchUpdateParams, opts ...option.RequestOption) (res *Session, err error) {
+func (r *SessionService) ScratchpadUpdate(ctx context.Context, id string, body SessionScratchpadUpdateParams, opts ...option.RequestOption) (res *Session, err error) {
 	opts = append(r.Options[:], opts...)
 	if id == "" {
 		err = errors.New("missing required id parameter")
 		return
 	}
-	path := fmt.Sprintf("session/%s/systemScratch", id)
+	path := fmt.Sprintf("session/%s/scratchpad", id)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPut, path, body, &res, opts...)
 	return
 }
@@ -1310,7 +1310,7 @@ type Session struct {
 	Time          SessionTime   `json:"time,required"`
 	Title         string        `json:"title,required"`
 	Version       string        `json:"version,required"`
-	SystemScratch string        `json:"systemScratch"`
+	Scratchpad string        `json:"scratchpad"`
 	ParentID      string        `json:"parentID"`
 	Revert        SessionRevert `json:"revert"`
 	Share         SessionShare  `json:"share"`
@@ -2458,33 +2458,33 @@ func (r SessionSummarizeParams) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
 }
 
-type SessionSystemScratchGetResponse struct {
-	SystemScratch string                              `json:"systemScratch,required"`
-	JSON          sessionSystemScratchGetResponseJSON `json:"-"`
+type SessionScratchpadGetResponse struct {
+	Scratchpad string                              `json:"scratchpad,required"`
+	JSON          sessionScratchpadGetResponseJSON `json:"-"`
 }
 
-type sessionSystemScratchGetResponseJSON struct {
-	SystemScratch apijson.Field
+type sessionScratchpadGetResponseJSON struct {
+	Scratchpad apijson.Field
 	raw           string
 	ExtraFields   map[string]apijson.Field
 }
 
-func (r sessionSystemScratchGetResponseJSON) RawJSON() string {
+func (r sessionScratchpadGetResponseJSON) RawJSON() string {
 	return r.raw
 }
 
-func (r *SessionSystemScratchGetResponse) UnmarshalJSON(data []byte) (err error) {
+func (r *SessionScratchpadGetResponse) UnmarshalJSON(data []byte) (err error) {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-func (r sessionSystemScratchGetResponseJSON) MarshalJSON() (data []byte, err error) {
+func (r sessionScratchpadGetResponseJSON) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
 }
 
-type SessionSystemScratchUpdateParams struct {
-	SystemScratch param.Field[string] `json:"systemScratch,required"`
+type SessionScratchpadUpdateParams struct {
+	Scratchpad param.Field[string] `json:"scratchpad,required"`
 }
 
-func (r SessionSystemScratchUpdateParams) MarshalJSON() (data []byte, err error) {
+func (r SessionScratchpadUpdateParams) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
 }

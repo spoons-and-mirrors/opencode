@@ -86,7 +86,7 @@ export namespace Session {
           diff: z.string().optional(),
         })
         .optional(),
-      systemScratch: z.string().optional(),
+      scratchpad: z.string().optional(),
     })
     .openapi({
       ref: "Session",

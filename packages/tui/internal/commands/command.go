@@ -151,7 +151,7 @@ const (
 	MessagesCopyCommand             CommandName = "messages_copy"
 	MessagesUndoCommand             CommandName = "messages_undo"
 	MessagesRedoCommand             CommandName = "messages_redo"
-	SystemScratchOpenCommand        CommandName = "system_scratch_open"
+	ScratchpadOpenCommand           CommandName = "scratchpad_open"
 	AppExitCommand                  CommandName = "app_exit"
 )
 
@@ -310,7 +310,7 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Trigger:     []string{"init"},
 		},
 		{
-			Name:        SystemScratchOpenCommand,
+			Name:        ScratchpadOpenCommand,
 			Description: "open session system scratch pad",
 			Keybindings: parseBindings("<leader>w"),
 			Trigger:     []string{"scratchpad", "notes", "scratch", "pad"},

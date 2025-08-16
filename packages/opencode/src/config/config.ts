@@ -224,7 +224,7 @@ export namespace Config {
         .optional()
         .default("ctrl+left")
         .describe("Cycle to previous child session"),
-      system_scratchpad_open: z.string().optional().default("<leader>w").describe("Open session system scratch pad"),
+      scratchpad_open: z.string().optional().default("<leader>w").describe("Open session scratchpad"),
       messages_page_up: z.string().optional().default("pgup").describe("Scroll messages up by one page"),
       messages_page_down: z.string().optional().default("pgdown").describe("Scroll messages down by one page"),
       messages_half_page_up: z.string().optional().default("ctrl+alt+u").describe("Scroll messages up by half page"),

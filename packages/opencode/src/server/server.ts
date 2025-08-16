@@ -751,16 +751,16 @@ export namespace Server {
         },
       )
       .get(
-        "/session/:id/systemScratch",
+        "/session/:id/scratchpad",
         describeRoute({
           description: "Get session system scratchpad content",
-          operationId: "session.systemScratch.get",
+          operationId: "session.scratchpad.get",
           responses: {
             200: {
               description: "System scratch content",
               content: {
                 "application/json": {
-                  schema: resolver(z.object({ systemScratch: z.string() })),
+                  schema: resolver(z.object({ scratchpad: z.string() })),
                 },
               },
             },
@@ -775,14 +775,14 @@ export namespace Server {
         async (c) => {
           const sessionID = c.req.valid("param").id
           const session = await Session.get(sessionID)
-          return c.json({ systemScratch: session?.systemScratch || "" })
+          return c.json({ scratchpad: session?.scratchpad || "" })
         },
       )
       .put(
-        "/session/:id/systemScratch",
+        "/session/:id/scratchpad",
         describeRoute({
           description: "Update session system scratchpad content",
-          operationId: "session.systemScratch.update",
+          operationId: "session.scratchpad.update",
           responses: {
             200: {
               description: "System scratch updated successfully",
@@ -803,15 +803,15 @@ export namespace Server {
         zValidator(
           "json",
           z.object({
-            systemScratch: z.string(),
+            scratchpad: z.string(),
           }),
         ),
         async (c) => {
           const sessionID = c.req.valid("param").id
-          const { systemScratch } = c.req.valid("json")
+          const { scratchpad } = c.req.valid("json")
 
           const updatedSession = await Session.update(sessionID, (session) => {
-            session.systemScratch = systemScratch
+            session.scratchpad = scratchpad
           })
 
           return c.json(updatedSession)

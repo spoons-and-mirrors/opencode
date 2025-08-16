@@ -684,7 +684,7 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dialog.ThemeSelectedMsg:
 		a.app.State.Theme = msg.ThemeName
 		cmds = append(cmds, a.app.SaveState())
-	case dialog.SystemScratchUpdatedMsg:
+	case dialog.ScratchpadUpdatedMsg:
 		// Handle scratchpad content updates
 		cmds = append(cmds, a.handleScratchpadUpdate(msg.Content))
 	case toast.ShowToastMsg:
@@ -1387,18 +1387,18 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		a.modal = themeDialog
 	case commands.ProjectInitCommand:
 		cmds = append(cmds, a.app.InitializeProject(context.Background()))
-	case commands.SystemScratchOpenCommand:
+	case commands.ScratchpadOpenCommand:
 		// Load system scratch content from server first
-		var systemScratchContent string
+		var scratchpadContent string
 		if a.app.Session != nil && a.app.Session.ID != "" {
-			a.app.LoadSessionSystemScratch(context.Background())
-			systemScratchContent = a.app.GetSessionSystemScratch()
+			a.app.LoadSessionScratchpad(context.Background())
+			scratchpadContent = a.app.GetSessionScratchpad()
 		} else {
-			systemScratchContent = a.app.State.HomescreenSystemScratch
+			scratchpadContent = a.app.State.HomescreenScratchpad
 		}
-		systemScratchDialog := dialog.NewSystemScratchDialog(a.app)
-		systemScratchDialog.SetContent(systemScratchContent)
-		a.modal = systemScratchDialog
+		scratchpadDialog := dialog.NewScratchpadDialog(a.app)
+		scratchpadDialog.SetContent(scratchpadContent)
+		a.modal = scratchpadDialog
 	case commands.InputClearCommand:
 		if a.editor.Value() == "" {
 			return a, nil
@@ -1541,9 +1541,9 @@ func formatConversationToMarkdown(messages []app.Message) string {
 func (a Model) handleScratchpadUpdate(content string) tea.Cmd {
 	return func() tea.Msg {
 		if a.app.Session != nil && a.app.Session.ID != "" {
-			a.app.SaveSessionSystemScratch(content)
+			a.app.SaveSessionScratchpad(content)
 		} else {
-			a.app.State.HomescreenSystemScratch = content
+			a.app.State.HomescreenScratchpad = content
 			a.app.SaveState() // persist homescreen system scratch
 		}
 		return nil

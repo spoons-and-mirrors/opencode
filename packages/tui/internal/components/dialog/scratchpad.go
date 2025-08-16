@@ -14,19 +14,7 @@ import (
 	"github.com/sst/opencode/internal/util"
 )
 
-// SystemScratchUpdatedMsg is sent when system scratch content is updated
-type SystemScratchUpdatedMsg struct {
-	Content string
-}
-
-// SystemScratchDialog interface for the system scratch modal
-type SystemScratchDialog interface {
-	layout.Modal
-	GetContent() string
-	SetContent(content string)
-}
-
-type systemScratchDialog struct {
+type scratchpadDialog struct {
 	width    int
 	height   int
 	modal    *modal.Modal
@@ -34,11 +22,23 @@ type systemScratchDialog struct {
 	app      *app.App
 }
 
-func (n *systemScratchDialog) Init() tea.Cmd {
+// ScratchpadUpdatedMsg is sent when system scratch content is updated
+type ScratchpadUpdatedMsg struct {
+	Content string
+}
+
+// ScratchpadDialog interface for the system scratch modal
+type ScratchpadDialog interface {
+	layout.Modal
+	GetContent() string
+	SetContent(content string)
+}
+
+func (n *scratchpadDialog) Init() tea.Cmd {
 	return n.textarea.Focus()
 }
 
-func (n *systemScratchDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (n *scratchpadDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		n.width = msg.Width
@@ -52,7 +52,7 @@ func (n *systemScratchDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			content := strings.TrimSpace(n.textarea.Value())
 			return n, tea.Sequence(
 				util.CmdHandler(modal.CloseModalMsg{}),
-				util.CmdHandler(SystemScratchUpdatedMsg{Content: content}),
+				util.CmdHandler(ScratchpadUpdatedMsg{Content: content}),
 			)
 		case "ctrl+v", "super+v":
 			// Handle paste directly using clipboard
@@ -80,7 +80,7 @@ func (n *systemScratchDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return n, cmd
 }
 
-func (n *systemScratchDialog) Render(background string) string {
+func (n *scratchpadDialog) Render(background string) string {
 	view := n.textarea.View()
 	helpText := styles.NewStyle().
 		Foreground(theme.CurrentTheme().TextMuted()).
@@ -90,22 +90,22 @@ func (n *systemScratchDialog) Render(background string) string {
 	return n.modal.Render(content, background)
 }
 
-func (n *systemScratchDialog) Close() tea.Cmd {
+func (n *scratchpadDialog) Close() tea.Cmd {
 	// Save content when closing
 	content := strings.TrimSpace(n.textarea.Value())
-	return util.CmdHandler(SystemScratchUpdatedMsg{Content: content})
+	return util.CmdHandler(ScratchpadUpdatedMsg{Content: content})
 }
 
-func (n *systemScratchDialog) GetContent() string {
+func (n *scratchpadDialog) GetContent() string {
 	return n.textarea.Value()
 }
 
-func (n *systemScratchDialog) SetContent(content string) {
+func (n *scratchpadDialog) SetContent(content string) {
 	n.textarea.SetValue(content)
 }
 
-// NewSystemScratchDialog creates a new system scratch modal dialog
-func NewSystemScratchDialog(app *app.App) SystemScratchDialog {
+// NewScratchpadDialog creates a new system scratch modal dialog
+func NewScratchpadDialog(app *app.App) ScratchpadDialog {
 	t := theme.CurrentTheme()
 	bgColor := t.BackgroundPanel()
 	textColor := t.Text()
@@ -130,7 +130,7 @@ func NewSystemScratchDialog(app *app.App) SystemScratchDialog {
 		Background(bgColor).
 		Lipgloss()
 
-	return &systemScratchDialog{
+	return &scratchpadDialog{
 		textarea: ta,
 		modal:    modal.New(modal.WithTitle("Scratchpad"), modal.WithMaxWidth(90)),
 		app:      app,

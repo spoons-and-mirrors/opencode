@@ -734,13 +734,13 @@ func (a *App) CreateSession(ctx context.Context) (*opencode.Session, error) {
 		return nil, err
 	}
 	// Transfer homescreen system scratch content if present
-	if a.State.HomescreenSystemScratch != "" {
-		_, err := a.Client.Session.SystemScratchUpdate(ctx, session.ID, opencode.SessionSystemScratchUpdateParams{
-			SystemScratch: opencode.F(a.State.HomescreenSystemScratch),
+	if a.State.HomescreenScratchpad != "" {
+		_, err := a.Client.Session.ScratchpadUpdate(ctx, session.ID, opencode.SessionScratchpadUpdateParams{
+			Scratchpad: opencode.F(a.State.HomescreenScratchpad),
 		})
 		if err == nil {
-			session.SystemScratch = a.State.HomescreenSystemScratch
-			a.State.HomescreenSystemScratch = ""
+			session.Scratchpad = a.State.HomescreenScratchpad
+			a.State.HomescreenScratchpad = ""
 			a.SaveState()
 		}
 	}
@@ -879,28 +879,22 @@ func (a *App) UpdateSession(ctx context.Context, sessionID string, title string)
 	return nil
 }
 
-func (a *App) GetSessionSystemScratch() string {
-	if a.Session == nil {
-		return ""
-	}
-	return a.Session.SystemScratch
-}
-
 func (a *App) GetSessionScratchpad() string {
 	if a.Session == nil {
 		return ""
 	}
-	return a.Session.SystemScratch
+	return a.Session.Scratchpad
 }
 
-func (a *App) SaveSessionSystemScratch(content string) error {
+
+func (a *App) SaveSessionScratchpad(content string) error {
 	if a.Session == nil {
 		return fmt.Errorf("no active session")
 	}
 
 	ctx := context.Background()
-	_, err := a.Client.Session.SystemScratchUpdate(ctx, a.Session.ID, opencode.SessionSystemScratchUpdateParams{
-		SystemScratch: opencode.F(content),
+	_, err := a.Client.Session.ScratchpadUpdate(ctx, a.Session.ID, opencode.SessionScratchpadUpdateParams{
+		Scratchpad: opencode.F(content),
 	})
 	if err != nil {
 		slog.Error("Failed to save system scratch", "error", err)
@@ -908,23 +902,23 @@ func (a *App) SaveSessionSystemScratch(content string) error {
 	}
 
 	// Update local session
-	a.Session.SystemScratch = content
+	a.Session.Scratchpad = content
 	return nil
 }
 
-func (a *App) LoadSessionSystemScratch(ctx context.Context) error {
+func (a *App) LoadSessionScratchpad(ctx context.Context) error {
 	if a.Session == nil {
 		return fmt.Errorf("no active session")
 	}
 
-	response, err := a.Client.Session.SystemScratchGet(ctx, a.Session.ID)
+	response, err := a.Client.Session.ScratchpadGet(ctx, a.Session.ID)
 	if err != nil {
 		slog.Error("Failed to load system scratch", "error", err)
 		return err
 	}
 
 	// Update local session
-	a.Session.SystemScratch = response.SystemScratch
+	a.Session.Scratchpad = response.Scratchpad
 	return nil
 }
 

@@ -27,7 +27,7 @@ type AgentModel struct {
 }
 
 type State struct {
-	HomescreenSystemScratch string                `toml:"homescreen_system_scratch"` // persists system scratch when no session is active
+	HomescreenScratchpad string                `toml:"homescreen_scratchpad"` // persists system scratch when no session is active
 	Theme                   string                `toml:"theme"`
 	AgentModel              map[string]AgentModel `toml:"agent_model"`
 	Provider                string                `toml:"provider"`
