@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/sst/opencode/internal/app"
+	"github.com/sst/opencode/internal/clipboard"
 	"github.com/sst/opencode/internal/components/modal"
 	"github.com/sst/opencode/internal/components/textarea"
 	"github.com/sst/opencode/internal/layout"
@@ -53,7 +54,25 @@ func (n *systemScratchDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				util.CmdHandler(modal.CloseModalMsg{}),
 				util.CmdHandler(SystemScratchUpdatedMsg{Content: content}),
 			)
+		case "ctrl+v", "super+v":
+			// Handle paste directly using clipboard
+			textBytes := clipboard.Read(clipboard.FmtText)
+			if textBytes != nil {
+				text := string(textBytes)
+				n.textarea.InsertRunesFromUserInput([]rune(text))
+			}
+			return n, nil
 		}
+	case tea.PasteMsg:
+		// Forward paste events to textarea for paste functionality
+		var cmd tea.Cmd
+		n.textarea, cmd = n.textarea.Update(msg)
+		return n, cmd
+	case tea.ClipboardMsg:
+		// Forward clipboard events to textarea for paste functionality
+		var cmd tea.Cmd
+		n.textarea, cmd = n.textarea.Update(msg)
+		return n, cmd
 	}
 
 	var cmd tea.Cmd
