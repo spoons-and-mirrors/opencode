@@ -1,6 +1,7 @@
 package spinner
 
 import (
+	"math"
 	"strings"
 	"time"
 
@@ -14,47 +15,23 @@ type TickMsg struct {
 	Time time.Time
 }
 
-// AnimationPhase represents which letter is currently animating
-type AnimationPhase int
-
-const (
-	PhaseOAnimating AnimationPhase = iota
-	PhaseOSleeping
-	PhaseCAnimating
-	PhaseCSleeping
-)
-
-// OpenCodeSpinner represents the animated O and C letter spinner
+// OpenCodeSpinner is a morphing O↔C spinner with trailing and easing
 type OpenCodeSpinner struct {
-	currentOFrame   int
-	currentCFrame   int
-	oFadeFrames     []int // tracks fade intensity for each position in O
-	cFadeFrames     []int // tracks fade intensity for each position in C
-	isAnimating     bool
-	interval        time.Duration
-	totalFrames     int // total frames elapsed
-	currentPhase    AnimationPhase
-	phaseFrameCount int // frames within current phase
-	oLoopFrames     int // number of frames for O to complete a loop
-	cLoopFrames     int // number of frames for C to complete a loop
-	sleepFrames     int // number of frames to sleep between animations
+	progress      float64       // 0.0–2.0, cycles O→C→O
+	interval      time.Duration // ms per frame
+	cycleDuration float64       // seconds for a full O→C→O cycle
+	trailLength   int           // how many trailing steps
+	isAnimating   bool
 }
 
-// New creates a new OpenCode spinner
+// New creates a new morphing O↔C spinner
 func New() *OpenCodeSpinner {
 	return &OpenCodeSpinner{
-		currentOFrame:   0,
-		currentCFrame:   0,
-		oFadeFrames:     make([]int, 10), // 10 positions for the O letter (4-tall rectangle)
-		cFadeFrames:     make([]int, 8),  // 8 positions for the C letter (4-tall rectangle)
-		isAnimating:     false,
-		interval:        120 * time.Millisecond,
-		totalFrames:     0,
-		currentPhase:    PhaseOAnimating,
-		phaseFrameCount: 0,
-		oLoopFrames:     10, // O has 10 positions to complete
-		cLoopFrames:     8,  // C has 8 positions to complete
-		sleepFrames:     8,  // sleep for 8 frames between animations
+		progress:      0,
+		interval:      60 * time.Millisecond,
+		cycleDuration: 2.2, // seconds for full O→C→O
+		trailLength:   5,
+		isAnimating:   false,
 	}
 }
 
@@ -78,84 +55,14 @@ func (s *OpenCodeSpinner) Update(msg tea.Msg) (*OpenCodeSpinner, tea.Cmd) {
 		if !s.isAnimating {
 			return s, nil
 		}
-
-		s.totalFrames++
-		s.phaseFrameCount++
-
-		// Handle different animation phases
-		switch s.currentPhase {
-		case PhaseOAnimating:
-			// Update fade for all O positions
-			for i := range s.oFadeFrames {
-				if s.oFadeFrames[i] > 0 {
-					s.oFadeFrames[i]--
-				}
-			}
-
-			// Set current O position to max fade
-			s.oFadeFrames[s.currentOFrame] = 4
-
-			// Move O to next frame (counter-clockwise)
-			s.currentOFrame = (s.currentOFrame - 1 + len(s.oFadeFrames)) % len(s.oFadeFrames)
-
-			// Check if O completed its loop
-			if s.phaseFrameCount >= s.oLoopFrames {
-				s.currentPhase = PhaseOSleeping
-				s.phaseFrameCount = 0
-			}
-
-		case PhaseOSleeping:
-			// O is sleeping, decay its fade
-			for i := range s.oFadeFrames {
-				if s.oFadeFrames[i] > 0 {
-					s.oFadeFrames[i]--
-				}
-			}
-
-			// Sleep completed, start C animation
-			if s.phaseFrameCount >= s.sleepFrames {
-				s.currentPhase = PhaseCAnimating
-				s.phaseFrameCount = 0
-			}
-
-		case PhaseCAnimating:
-			// Update fade for all C positions
-			for i := range s.cFadeFrames {
-				if s.cFadeFrames[i] > 0 {
-					s.cFadeFrames[i]--
-				}
-			}
-
-			// Set current C position to max fade
-			s.cFadeFrames[s.currentCFrame] = 4
-
-			// Move C to next frame (clockwise)
-			s.currentCFrame = (s.currentCFrame + 1) % len(s.cFadeFrames)
-
-			// Check if C completed its loop
-			if s.phaseFrameCount >= s.cLoopFrames {
-				s.currentPhase = PhaseCSleeping
-				s.phaseFrameCount = 0
-			}
-
-		case PhaseCSleeping:
-			// C is sleeping, decay its fade
-			for i := range s.cFadeFrames {
-				if s.cFadeFrames[i] > 0 {
-					s.cFadeFrames[i]--
-				}
-			}
-
-			// Sleep completed, start O animation again
-			if s.phaseFrameCount >= s.sleepFrames {
-				s.currentPhase = PhaseOAnimating
-				s.phaseFrameCount = 0
-			}
+		// Advance progress
+		step := s.interval.Seconds() / s.cycleDuration
+		s.progress += step
+		if s.progress >= 2.0 {
+			s.progress -= 2.0
 		}
-
 		return s, s.tick()
 	}
-
 	return s, nil
 }
 
@@ -170,115 +77,9 @@ func (s *OpenCodeSpinner) Stop() {
 	s.isAnimating = false
 }
 
-// ViewO renders just the O letter animation
-func (s *OpenCodeSpinner) ViewO() string {
-	t := theme.CurrentTheme()
-
-	// Define the O letter sprite positions (2x4 grid, counter-clockwise from top-left)
-	// Based on the sprite image: O is 2 pixels wide, 4 pixels tall
-	// Positions: 0=top-left, 1=left-top, 2=left-bottom, 3=bottom-left, 4=bottom-right, 5=right-bottom, 6=right-top, 7=top-right, 8=top-mid-left, 9=top-mid-right
-	oPositions := [][]int{
-		{0, 9}, // top row
-		{8, 6}, // second row
-		{1, 5}, // third row
-		{2, 4}, // bottom row
-	}
-
-	var builder strings.Builder
-
-	for row := 0; row < 4; row++ {
-		for col := 0; col < 2; col++ {
-			pos := oPositions[row][col]
-
-			// Get fade level for this position
-			fade := s.oFadeFrames[pos]
-
-			// Create styled block based on fade level
-			var style lipgloss.Style
-			switch fade {
-			case 4: // Brightest (current position)
-				style = lipgloss.NewStyle().Foreground(t.Primary())
-			case 3: // Fade level 1
-				style = lipgloss.NewStyle().Foreground(t.Primary()).Faint(true)
-			case 2: // Fade level 2
-				style = lipgloss.NewStyle().Foreground(t.TextMuted())
-			case 1: // Fade level 3
-				style = lipgloss.NewStyle().Foreground(t.TextMuted()).Faint(true)
-			default: // Invisible
-				style = lipgloss.NewStyle().Foreground(t.Background())
-			}
-
-			// Use solid block character
-			builder.WriteString(style.Render("██"))
-		}
-		if row < 3 {
-			builder.WriteString("\n")
-		}
-	}
-
-	return builder.String()
-}
-
-// ViewC renders just the C letter animation
-func (s *OpenCodeSpinner) ViewC() string {
-	t := theme.CurrentTheme()
-
-	// Define the C letter sprite positions (2x4 grid)
-	// Based on the sprite image: C is 2 pixels wide, 4 pixels tall, open on the right
-	// Positions: 0=top-left, 1=left-top, 2=left-bottom, 3=bottom-left, 4=top-right (only top), 5=bottom-right (only bottom), 6=left-mid-top, 7=left-mid-bottom
-	cPositions := [][]int{
-		{0, 4},  // top row (top-left, top-right)
-		{6, -1}, // second row (left only, C is open on right)
-		{7, -1}, // third row (left only, C is open on right)
-		{3, 5},  // bottom row (bottom-left, bottom-right)
-	}
-
-	var builder strings.Builder
-
-	for row := 0; row < 4; row++ {
-		for col := 0; col < 2; col++ {
-			pos := cPositions[row][col]
-
-			if pos == -1 {
-				// Empty space (C is open on the right)
-				builder.WriteString("  ")
-			} else {
-				// Get fade level for this position
-				fade := s.cFadeFrames[pos]
-
-				// Create styled block based on fade level
-				var style lipgloss.Style
-				switch fade {
-				case 4: // Brightest (current position)
-					style = lipgloss.NewStyle().Foreground(t.Primary())
-				case 3: // Fade level 1
-					style = lipgloss.NewStyle().Foreground(t.Primary()).Faint(true)
-				case 2: // Fade level 2
-					style = lipgloss.NewStyle().Foreground(t.TextMuted())
-				case 1: // Fade level 3
-					style = lipgloss.NewStyle().Foreground(t.TextMuted()).Faint(true)
-				default: // Invisible
-					style = lipgloss.NewStyle().Foreground(t.Background())
-				}
-
-				// Use solid block character
-				builder.WriteString(style.Render("████"))
-			}
-		}
-		if row < 3 {
-			builder.WriteString("\n")
-		}
-	}
-
-	return builder.String()
-}
-
 // View renders the current frame of the spinner (both O and C)
 func (s *OpenCodeSpinner) View() string {
-	oView := s.ViewO()
-	cView := s.ViewC()
-
-	return lipgloss.JoinHorizontal(lipgloss.Top, oView, "  ", cView)
+	return lipgloss.JoinHorizontal(lipgloss.Top, s.ViewO(), "  ", s.ViewC())
 }
 
 // ViewOCOnly renders just the O and C letters together without any other text
@@ -294,4 +95,148 @@ func (s *OpenCodeSpinner) IsAnimating() bool {
 // SetInterval changes the animation speed
 func (s *OpenCodeSpinner) SetInterval(interval time.Duration) {
 	s.interval = interval
+}
+
+// --- Animation logic ---
+
+// O and C share a 2x4 grid, with 10 O positions and 8 C positions
+var oPath = []struct{ row, col int }{
+	{0, 0}, {1, 0}, {2, 0}, {3, 0}, // left side, top to bottom
+	{3, 1}, {2, 1}, {1, 1}, {0, 1}, // right side, bottom to top
+	{0, 0}, {0, 1}, // top left, top right (for smoothness)
+}
+var cPath = []struct{ row, col int }{
+	{0, 0}, {1, 0}, {2, 0}, {3, 0}, // left side, top to bottom
+	{3, 1}, {2, 1}, // bottom right, mid right (open top)
+	{0, 1}, // top right (open)
+	{0, 0}, // loop
+}
+
+// Easing for morphing
+func easeInOutSine(t float64) float64 {
+	return -(math.Cos(math.Pi*t) - 1) / 2
+}
+
+// ViewO renders the O morphing into C with a squeeze/open effect
+func (s *OpenCodeSpinner) ViewO() string {
+	t := theme.CurrentTheme()
+	grid := [4][2]int{} // fade level per cell
+
+	// O→C morph progress: 0.0–1.0
+	var morph float64
+	if s.progress < 1.0 {
+		morph = easeInOutSine(s.progress)
+	} else {
+		morph = 1 - easeInOutSine(s.progress-1)
+	}
+
+	// Squeeze O horizontally and open right side
+	for row := 0; row < 4; row++ {
+		// Left column always present, fades with morph
+		fade := s.trailLength
+		if morph > 0.7 {
+			fade = int(float64(s.trailLength) * (1.0 - (morph-0.7)/0.3))
+		}
+		grid[row][0] = fade
+		// Right column: fades out as O opens
+		if morph < 0.5 {
+			grid[row][1] = int(float64(s.trailLength) * (1.0 - morph*2))
+		} else {
+			grid[row][1] = 0
+		}
+	}
+	// Top and bottom right corners fade in as C
+	if morph > 0.5 {
+		grid[0][1] = int(float64(s.trailLength) * (morph - 0.5) * 2)
+		grid[3][1] = int(float64(s.trailLength) * (morph - 0.5) * 2)
+	}
+	// Add a little bounce at the end of morph
+	if morph > 0.95 {
+		grid[1][1] = int(float64(s.trailLength) * (morph - 0.95) * 20)
+		grid[2][1] = int(float64(s.trailLength) * (morph - 0.95) * 20)
+	}
+
+	// Render
+	var b strings.Builder
+	for row := 0; row < 4; row++ {
+		for col := 0; col < 2; col++ {
+			fade := grid[row][col]
+			style := fadeStyle(t, fade, s.trailLength)
+			b.WriteString(style.Render("██"))
+		}
+		if row < 3 {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+// ViewC renders the C morphing from O with a grow/bounce effect
+func (s *OpenCodeSpinner) ViewC() string {
+	t := theme.CurrentTheme()
+	grid := [4][2]int{} // fade level per cell
+
+	// O→C morph progress: 0.0–1.0
+	var morph float64
+	if s.progress < 1.0 {
+		morph = easeInOutSine(s.progress)
+	} else {
+		morph = 1 - easeInOutSine(s.progress-1)
+	}
+
+	// C grows from the O opening, with a bounce
+	for row := 0; row < 4; row++ {
+		// Left column: fade in as morph progresses
+		if morph > 0.5 {
+			grid[row][0] = int(float64(s.trailLength) * (morph - 0.5) * 2)
+		}
+		// Right column: only top and bottom, fade in with morph
+		if row == 0 || row == 3 {
+			if morph > 0.7 {
+				grid[row][1] = int(float64(s.trailLength) * (morph - 0.7) / 0.3)
+			}
+		}
+	}
+	// Add a snap/overshoot at the end
+	if morph > 0.95 {
+		grid[1][1] = int(float64(s.trailLength) * (morph - 0.95) * 20)
+		grid[2][1] = int(float64(s.trailLength) * (morph - 0.95) * 20)
+	}
+
+	// Render
+	var b strings.Builder
+	for row := 0; row < 4; row++ {
+		for col := 0; col < 2; col++ {
+			fade := grid[row][col]
+			style := fadeStyle(t, fade, s.trailLength)
+			b.WriteString(style.Render("██"))
+		}
+		if row < 3 {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+// fadeStyle returns a lipgloss style for a given fade level
+func fadeStyle(t theme.Theme, fade, maxFade int) lipgloss.Style {
+	switch {
+	case fade >= maxFade:
+		return lipgloss.NewStyle().Foreground(t.Primary()).Bold(true)
+	case fade >= maxFade-1:
+		return lipgloss.NewStyle().Foreground(t.Primary()).Faint(true)
+	case fade >= maxFade-2:
+		return lipgloss.NewStyle().Foreground(t.TextMuted())
+	case fade >= 1:
+		return lipgloss.NewStyle().Foreground(t.TextMuted()).Faint(true)
+	default:
+		return lipgloss.NewStyle().Foreground(t.Background())
+	}
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
