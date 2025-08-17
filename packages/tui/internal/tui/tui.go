@@ -905,21 +905,22 @@ func (a Model) home() (string, int, int) {
 	t := theme.CurrentTheme()
 	effectiveWidth := a.width - 4
 	baseStyle := styles.NewStyle().Background(t.Background())
+	base := baseStyle.Render
 	muted := styles.NewStyle().Foreground(t.TextMuted()).Background(t.Background()).Render
 
-	// Show animated OC spinner with "pencode" text for full opencode
-	spinnerView := a.ocSpinner.View()
-	pencode := `
-█▀▀█ █▀▀ █▀▀▄ █▀▀ █▀▀█ █▀▀▄ █▀▀
-█░░█ █▀▀ █░░█ █░░ █░░█ █░░█ █▀▀
-█▀▀▀ ▀▀▀ ▀  ▀ ▀▀▀ ▀▀▀▀ ▀▀▀  ▀▀▀`
+	open := `
+█▀▀█ █▀▀█ █▀▀ █▀▀▄ 
+█░░█ █░░█ █▀▀ █░░█ 
+▀▀▀▀ █▀▀▀ ▀▀▀ ▀  ▀ `
+	code := `
+█▀▀ █▀▀█ █▀▀▄ █▀▀
+█░░ █░░█ █░░█ █▀▀
+▀▀▀ ▀▀▀▀ ▀▀▀  ▀▀▀`
 
-	// Full "opencode" logo with animated O and C
 	logo := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		spinnerView,
-		"  ",
-		muted(pencode),
+		muted(open),
+		base(code),
 	)
 
 	// Just "OC" animated below
