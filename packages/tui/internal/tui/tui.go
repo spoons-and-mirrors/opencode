@@ -24,6 +24,7 @@ import (
 	cmdcomp "github.com/sst/opencode/internal/components/commands"
 	"github.com/sst/opencode/internal/components/dialog"
 	"github.com/sst/opencode/internal/components/modal"
+	"github.com/sst/opencode/internal/components/spinner"
 	"github.com/sst/opencode/internal/components/status"
 	"github.com/sst/opencode/internal/components/toast"
 	"github.com/sst/opencode/internal/layout"
@@ -77,6 +78,7 @@ type Model struct {
 	interruptKeyState    InterruptKeyState
 	exitKeyState         ExitKeyState
 	messagesRight        bool
+	ocSpinner            *spinner.OpenCodeSpinner
 }
 
 func (a Model) Init() tea.Cmd {
@@ -92,6 +94,7 @@ func (a Model) Init() tea.Cmd {
 	cmds = append(cmds, a.status.Init())
 	cmds = append(cmds, a.completions.Init())
 	cmds = append(cmds, a.toastManager.Init())
+	cmds = append(cmds, a.ocSpinner.Init())
 
 	return tea.Batch(cmds...)
 }
@@ -697,6 +700,10 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tm, cmd := a.toastManager.Update(msg)
 		a.toastManager = tm
 		cmds = append(cmds, cmd)
+	case spinner.TickMsg:
+		s, cmd := a.ocSpinner.Update(msg)
+		a.ocSpinner = s
+		cmds = append(cmds, cmd)
 	case InterruptDebounceTimeoutMsg:
 		// Reset interrupt key state after timeout
 		a.interruptKeyState = InterruptKeyIdle
@@ -898,25 +905,25 @@ func (a Model) home() (string, int, int) {
 	t := theme.CurrentTheme()
 	effectiveWidth := a.width - 4
 	baseStyle := styles.NewStyle().Background(t.Background())
-	base := baseStyle.Render
 	muted := styles.NewStyle().Foreground(t.TextMuted()).Background(t.Background()).Render
 
-	open := `
-█▀▀█ █▀▀█ █▀▀ █▀▀▄ 
-█░░█ █░░█ █▀▀ █░░█ 
-▀▀▀▀ █▀▀▀ ▀▀▀ ▀  ▀ `
-	code := `
-█▀▀ █▀▀█ █▀▀▄ █▀▀
-█░░ █░░█ █░░█ █▀▀
-▀▀▀ ▀▀▀▀ ▀▀▀  ▀▀▀`
+	// Show animated OC spinner with "pencode" text for full opencode
+	spinnerView := a.ocSpinner.View()
+	pencode := `
+█▀▀█ █▀▀ █▀▀▄ █▀▀ █▀▀█ █▀▀▄ █▀▀
+█░░█ █▀▀ █░░█ █░░ █░░█ █░░█ █▀▀
+█▀▀▀ ▀▀▀ ▀  ▀ ▀▀▀ ▀▀▀▀ ▀▀▀  ▀▀▀`
 
+	// Full "opencode" logo with animated O and C
 	logo := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		muted(open),
-		base(code),
+		spinnerView,
+		"  ",
+		muted(pencode),
 	)
-	// cwd := app.Info.Path.Cwd
-	// config := app.Info.Path.Config
+
+	// Just "OC" animated below
+	ocOnly := a.ocSpinner.ViewOCOnly()
 
 	versionStyle := styles.NewStyle().
 		Foreground(t.TextMuted()).
@@ -930,6 +937,14 @@ func (a Model) home() (string, int, int) {
 		effectiveWidth,
 		lipgloss.Center,
 		logoAndVersion,
+		styles.WhitespaceStyle(t.Background()),
+	)
+
+	// Center the standalone OC
+	ocCentered := lipgloss.PlaceHorizontal(
+		effectiveWidth,
+		lipgloss.Center,
+		ocOnly,
 		styles.WhitespaceStyle(t.Background()),
 	)
 
@@ -958,6 +973,7 @@ func (a Model) home() (string, int, int) {
 	lines = append(lines, "")
 	lines = append(lines, logoAndVersion)
 	lines = append(lines, "")
+	lines = append(lines, ocCentered) // Add standalone OC animation
 	lines = append(lines, "")
 	lines = append(lines, cmds)
 	lines = append(lines, "")
@@ -1481,6 +1497,7 @@ func NewModel(app *app.App) tea.Model {
 		toastManager:         toast.NewToastManager(),
 		interruptKeyState:    InterruptKeyIdle,
 		exitKeyState:         ExitKeyIdle,
+		ocSpinner:            spinner.New(),
 	}
 
 	return model
