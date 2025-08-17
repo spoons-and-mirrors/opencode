@@ -151,6 +151,8 @@ const (
 	MessagesCopyCommand             CommandName = "messages_copy"
 	MessagesUndoCommand             CommandName = "messages_undo"
 	MessagesRedoCommand             CommandName = "messages_redo"
+	MessagesPartUndoCommand         CommandName = "messages_part_undo"
+	MessagesPartRedoCommand         CommandName = "messages_part_redo"
 	AppExitCommand                  CommandName = "app_exit"
 )
 
@@ -370,6 +372,16 @@ func LoadFromConfig(config *opencode.Config) CommandRegistry {
 			Description: "undo last message",
 			Keybindings: parseBindings("<leader>u"),
 			Trigger:     []string{"undo"},
+		},
+		{
+			Name:        MessagesPartUndoCommand,
+			Description: "undo last part",
+			Keybindings: parseBindings("<leader>U"),
+		},
+		{
+			Name:        MessagesPartRedoCommand,
+			Description: "redo last part",
+			Keybindings: parseBindings("<leader>R"),
 		},
 		{
 			Name:        MessagesRedoCommand,

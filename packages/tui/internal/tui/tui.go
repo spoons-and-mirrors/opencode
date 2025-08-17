@@ -1440,6 +1440,14 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		updated, cmd := a.messages.UndoLastMessage()
 		a.messages = updated.(chat.MessagesComponent)
 		cmds = append(cmds, cmd)
+	case commands.MessagesPartUndoCommand:
+		updated, cmd := a.messages.UndoLastPart()
+		a.messages = updated.(chat.MessagesComponent)
+		cmds = append(cmds, cmd)
+	case commands.MessagesPartRedoCommand:
+		updated, cmd := a.messages.RedoLastPart()
+		a.messages = updated.(chat.MessagesComponent)
+		cmds = append(cmds, cmd)
 	case commands.MessagesRedoCommand:
 		updated, cmd := a.messages.RedoLastMessage()
 		a.messages = updated.(chat.MessagesComponent)

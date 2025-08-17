@@ -252,6 +252,8 @@ export namespace Config {
       messages_last: z.string().optional().default("ctrl+alt+g").describe("Navigate to last message"),
       messages_copy: z.string().optional().default("<leader>y").describe("Copy message"),
       messages_undo: z.string().optional().default("<leader>u").describe("Undo message"),
+      messages_part_undo: z.string().optional().default("<leader>U").describe("Undo single part"),
+      messages_part_redo: z.string().optional().default("<leader>R").describe("Redo single part"),
       messages_redo: z.string().optional().default("<leader>r").describe("Redo message"),
       model_list: z.string().optional().default("<leader>m").describe("List available models"),
       model_cycle_recent: z.string().optional().default("f2").describe("Next recent model"),

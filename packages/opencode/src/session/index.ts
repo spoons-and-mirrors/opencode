@@ -86,6 +86,20 @@ export namespace Session {
           diff: z.string().optional(),
         })
         .optional(),
+      removedParts: z
+        .array(
+          z.object({
+            messageID: z.string(),
+            partID: z.string(),
+            partData: z.any(), // Store the actual part data
+            originalIndex: z.number(), // Store original position in parts array
+            snapshot: z.string().optional(), // Store snapshot hash for reverting code changes
+            diff: z.string().optional(), // Store diff for UI display
+            revertedPatches: z.array(z.any()).optional(), // Store patches that were reverted
+          }),
+        )
+        .optional()
+        .default([]),
     })
     .openapi({
       ref: "Session",
@@ -173,6 +187,7 @@ export namespace Session {
         created: Date.now(),
         updated: Date.now(),
       },
+      removedParts: [],
     }
     log.info("created", result)
     state().sessions.set(result.id, result)
@@ -1487,6 +1502,155 @@ export namespace Session {
       draft.revert = undefined
     })
     return next
+  }
+
+  export const RemovePartInput = z.object({
+    sessionID: Identifier.schema("session"),
+    messageID: Identifier.schema("message"),
+    partID: Identifier.schema("part"),
+  })
+  export type RemovePartInput = z.infer<typeof RemovePartInput>
+
+  export async function removePart(input: RemovePartInput) {
+    log.info("removing part", input)
+
+    // Get all messages for the session
+    const msgs = await messages(input.sessionID)
+
+    // Find the target message
+    const targetMessage = msgs.find((msg) => msg.info.id === input.messageID)
+    if (!targetMessage) {
+      throw new Error(`Message ${input.messageID} not found`)
+    }
+
+    // Find the target part and its index
+    const targetPartIndex = targetMessage.parts.findIndex((part) => part.id === input.partID)
+    if (targetPartIndex === -1) {
+      throw new Error(`Part ${input.partID} not found in message ${input.messageID}`)
+    }
+    const targetPart = targetMessage.parts[targetPartIndex]
+
+    // Collect all patch parts that come after this part to revert file changes
+    const patches: MessageV2.PatchPart[] = []
+    let foundTargetPart = false
+
+    for (const msg of msgs) {
+      for (const part of msg.parts) {
+        // Once we find the target part, start collecting patches
+        if (part.id === input.partID) {
+          foundTargetPart = true
+          continue
+        }
+
+        // Collect all patches that come after the target part
+        if (foundTargetPart && part.type === "patch") {
+          patches.push(part as MessageV2.PatchPart)
+        }
+      }
+    }
+
+    // If there are patches to revert (meaning this part caused file changes),
+    // track snapshot and revert the patches
+    let snapshot: string | undefined = undefined
+    let diff: string | undefined = undefined
+    if (patches.length > 0) {
+      // Track snapshot before reverting
+      snapshot = await Snapshot.track()
+      // Revert all patches that came after this part
+      await Snapshot.revert(patches)
+      // Get the diff for UI/redo
+      if (snapshot) diff = await Snapshot.diff(snapshot)
+    }
+
+    // Remove the part from the message
+    targetMessage.parts = targetMessage.parts.filter((part) => part.id !== input.partID)
+
+    // Update the message in storage
+    await updateMessage(targetMessage.info)
+
+    // Remove the part from storage
+    await Storage.remove(`session/part/${input.sessionID}/${input.messageID}/${input.partID}`)
+
+    // Track the removed part for redo functionality
+    await update(input.sessionID, (draft) => {
+      if (!draft.removedParts) draft.removedParts = []
+      draft.removedParts.push({
+        messageID: input.messageID,
+        partID: input.partID,
+        partData: targetPart,
+        originalIndex: targetPartIndex,
+        snapshot,
+        diff,
+        revertedPatches: patches,
+      })
+    })
+
+    // Publish event for UI updates
+    await Bus.publish(MessageV2.Event.PartRemoved, {
+      sessionID: input.sessionID,
+      messageID: input.messageID,
+      partID: input.partID,
+    })
+
+    return await get(input.sessionID)
+  }
+
+  export const RestorePartInput = z.object({
+    sessionID: Identifier.schema("session"),
+  })
+  export type RestorePartInput = z.infer<typeof RestorePartInput>
+
+  export async function restorePart(input: RestorePartInput) {
+    log.info("restoring most recent removed part", input)
+
+    const session = await get(input.sessionID)
+
+    // Check if there are any removed parts to restore
+    if (!session.removedParts || session.removedParts.length === 0) {
+      throw new Error("No removed parts to restore")
+    }
+
+    // Get the most recently removed part (last in array)
+    const removedPart = session.removedParts[session.removedParts.length - 1]
+
+    // If we reverted patches when removing this part, restore them
+    if (removedPart.snapshot) {
+      await Snapshot.restore(removedPart.snapshot)
+    }
+
+    // Get all messages for the session
+    const msgs = await messages(input.sessionID)
+
+    // Find the target message
+    const targetMessage = msgs.find((msg) => msg.info.id === removedPart.messageID)
+    if (!targetMessage) {
+      throw new Error(`Message ${removedPart.messageID} not found`)
+    }
+
+    // Insert the part back at its original position
+    targetMessage.parts.splice(removedPart.originalIndex, 0, removedPart.partData as MessageV2.Part)
+
+    // Update the message in storage
+    await updateMessage(targetMessage.info)
+
+    // Store the part back in storage
+    await updatePart(removedPart.partData as MessageV2.Part)
+
+    // Remove the restored part from the removedParts array
+    await update(input.sessionID, (draft) => {
+      if (draft.removedParts) {
+        draft.removedParts.pop() // Remove the last (most recent) item
+      }
+    })
+
+    // Publish event for UI updates
+    await Bus.publish(MessageV2.Event.PartAdded, {
+      sessionID: input.sessionID,
+      messageID: removedPart.messageID,
+      partID: removedPart.partID,
+    })
+
+    return await get(input.sessionID)
   }
 
   export async function summarize(input: { sessionID: string; providerID: string; modelID: string }) {

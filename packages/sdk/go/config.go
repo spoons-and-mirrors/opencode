@@ -1736,6 +1736,10 @@ type KeybindsConfig struct {
 	MessagesRevert string `json:"messages_revert,required"`
 	// Undo message
 	MessagesUndo string `json:"messages_undo,required"`
+	// Undo single part
+	MessagesPartUndo string `json:"messages_part_undo,required"`
+	// Redo single part
+	MessagesPartRedo string `json:"messages_part_redo,required"`
 	// Next recent model
 	ModelCycleRecent string `json:"model_cycle_recent,required"`
 	// Previous recent model
@@ -1809,6 +1813,8 @@ type keybindsConfigJSON struct {
 	MessagesRedo             apijson.Field
 	MessagesRevert           apijson.Field
 	MessagesUndo             apijson.Field
+	MessagesPartUndo         apijson.Field
+	MessagesPartRedo         apijson.Field
 	ModelCycleRecent         apijson.Field
 	ModelCycleRecentReverse  apijson.Field
 	ModelList                apijson.Field

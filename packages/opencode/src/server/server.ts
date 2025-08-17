@@ -720,6 +720,65 @@ export namespace Server {
         },
       )
       .post(
+        "/session/:id/remove-part",
+        describeRoute({
+          description: "Remove a single part from a message",
+          operationId: "session.removePart",
+          responses: {
+            200: {
+              description: "Updated session",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        zValidator("json", Session.RemovePartInput.omit({ sessionID: true })),
+        async (c) => {
+          const id = c.req.valid("param").id
+          log.info("remove part", c.req.valid("json"))
+          const session = await Session.removePart({ sessionID: id, ...c.req.valid("json") })
+          return c.json(session)
+        },
+      )
+      .post(
+        "/session/:id/restore-part",
+        describeRoute({
+          description: "Restore the most recently removed part",
+          operationId: "session.restorePart",
+          responses: {
+            200: {
+              description: "Updated session",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info),
+                },
+              },
+            },
+          },
+        }),
+        zValidator(
+          "param",
+          z.object({
+            id: z.string(),
+          }),
+        ),
+        async (c) => {
+          const id = c.req.valid("param").id
+          log.info("restore part", { sessionID: id })
+          const session = await Session.restorePart({ sessionID: id })
+          return c.json(session)
+        },
+      )
+      .post(
         "/session/:id/permissions/:permissionID",
         describeRoute({
           description: "Respond to a permission request",

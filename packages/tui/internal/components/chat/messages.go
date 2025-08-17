@@ -39,6 +39,8 @@ type MessagesComponent interface {
 	GotoBottom() (tea.Model, tea.Cmd)
 	CopyLastMessage() (tea.Model, tea.Cmd)
 	UndoLastMessage() (tea.Model, tea.Cmd)
+	UndoLastPart() (tea.Model, tea.Cmd)
+	RedoLastPart() (tea.Model, tea.Cmd)
 	RedoLastMessage() (tea.Model, tea.Cmd)
 	ScrollToMessage(messageID string) (tea.Model, tea.Cmd)
 }
@@ -1150,6 +1152,99 @@ func (m *messagesComponent) UndoLastMessage() (tea.Model, tea.Cmd) {
 			return toast.NewErrorToast("Failed to undo message")
 		}
 		return app.MessageRevertedMsg{Session: *response, Message: revertedMessage}
+	}
+}
+
+func (m *messagesComponent) UndoLastPart() (tea.Model, tea.Cmd) {
+	// Find the most recent part by traversing messages in reverse
+	var lastPartMessageID string
+	var lastPartID string
+	var revertedMessage app.Message
+
+	// Traverse messages in reverse order (most recent first)
+	for i := len(m.app.Messages) - 1; i >= 0; i-- {
+		message := m.app.Messages[i]
+
+		// Traverse parts in reverse order (most recent first)
+		for j := len(message.Parts) - 1; j >= 0; j-- {
+			part := message.Parts[j]
+			// Found the most recent part (any type)
+			switch p := part.(type) {
+			case opencode.ToolPart:
+				lastPartID = p.ID
+			case opencode.TextPart:
+				lastPartID = p.ID
+			case opencode.FilePart:
+				lastPartID = p.ID
+			case opencode.AgentPart:
+				lastPartID = p.ID
+			case opencode.ReasoningPart:
+				lastPartID = p.ID
+			default:
+				continue // Skip unknown part types
+			}
+
+			// Get message ID from the message info
+			switch casted := message.Info.(type) {
+			case opencode.UserMessage:
+				lastPartMessageID = casted.ID
+			case opencode.AssistantMessage:
+				lastPartMessageID = casted.ID
+			}
+			revertedMessage = message
+			break
+		}
+
+		// If we found a part, stop searching
+		if lastPartID != "" {
+			break
+		}
+	}
+
+	// If no part found, return error
+	if lastPartID == "" {
+		return m, func() tea.Msg {
+			return toast.NewErrorToast("No part to undo")
+		}
+	}
+
+	// Call the session removePart API to surgically remove the part
+	return m, func() tea.Msg {
+		response, err := m.app.Client.Session.RemovePart(
+			context.Background(),
+			m.app.Session.ID,
+			opencode.SessionRemovePartParams{
+				MessageID: opencode.F(lastPartMessageID),
+				PartID:    opencode.F(lastPartID),
+			},
+		)
+		if err != nil {
+			slog.Error("Failed to undo part", "error", err)
+			return toast.NewErrorToast("Failed to undo part")
+		}
+		if response == nil {
+			return toast.NewErrorToast("Failed to undo part")
+		}
+		return app.MessageRevertedMsg{Session: *response, Message: revertedMessage}
+	}
+}
+
+func (m *messagesComponent) RedoLastPart() (tea.Model, tea.Cmd) {
+	// Call the session restorePart API to restore the most recently removed part
+	return m, func() tea.Msg {
+		response, err := m.app.Client.Session.RestorePart(
+			context.Background(),
+			m.app.Session.ID,
+		)
+		if err != nil {
+			slog.Error("Failed to redo part", "error", err)
+			return toast.NewErrorToast("Failed to redo part")
+		}
+		if response == nil {
+			return toast.NewErrorToast("Failed to redo part")
+		}
+		// Use MessageRevertedMsg since it's the general message update event
+		return app.MessageRevertedMsg{Session: *response, Message: app.Message{}}
 	}
 }
 
