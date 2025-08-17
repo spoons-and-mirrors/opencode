@@ -2,6 +2,7 @@ package spinner
 
 import (
 	_ "embed"
+	"regexp"
 	"strings"
 	"time"
 
@@ -13,9 +14,7 @@ import (
 //go:embed frames.md
 var framesData string
 
-type TickMsg struct {
-	Time time.Time
-}
+type TickMsg struct{ Time time.Time }
 
 type OpenCodeSpinner struct {
 	currentFrame int
@@ -25,13 +24,10 @@ type OpenCodeSpinner struct {
 }
 
 func New() *OpenCodeSpinner {
-	spinner := &OpenCodeSpinner{
-		currentFrame: 0,
-		interval:     90 * time.Millisecond, // 10fps
-		isAnimating:  false,
+	return &OpenCodeSpinner{
+		frames:   parseFrames(framesData),
+		interval: 90 * time.Millisecond,
 	}
-	spinner.frames = ParseFramesMD(framesData)
-	return spinner
 }
 
 func (s *OpenCodeSpinner) Init() tea.Cmd {
@@ -39,18 +35,8 @@ func (s *OpenCodeSpinner) Init() tea.Cmd {
 	return s.tick()
 }
 
-func (s *OpenCodeSpinner) tick() tea.Cmd {
-	return tea.Tick(s.interval, func(t time.Time) tea.Msg {
-		return TickMsg{Time: t}
-	})
-}
-
 func (s *OpenCodeSpinner) Update(msg tea.Msg) (*OpenCodeSpinner, tea.Cmd) {
-	switch msg.(type) {
-	case TickMsg:
-		if !s.isAnimating {
-			return s, nil
-		}
+	if _, ok := msg.(TickMsg); ok && s.isAnimating {
 		s.currentFrame = (s.currentFrame + 1) % len(s.frames)
 		return s, s.tick()
 	}
@@ -61,66 +47,69 @@ func (s *OpenCodeSpinner) View() string {
 	if len(s.frames) == 0 {
 		return ""
 	}
-	return s.renderFrame(s.frames[s.currentFrame])
+	return s.render(s.frames[s.currentFrame])
 }
 
 func (s *OpenCodeSpinner) ViewOCOnly() string {
 	return s.View()
 }
 
-func (s *OpenCodeSpinner) renderFrame(frame string) string {
-	t := theme.CurrentTheme()
-	var builder strings.Builder
-	lines := strings.Split(frame, "\n")
+func (s *OpenCodeSpinner) tick() tea.Cmd {
+	return tea.Tick(s.interval, func(t time.Time) tea.Msg {
+		return TickMsg{Time: t}
+	})
+}
 
-	for i, line := range lines {
+func (s *OpenCodeSpinner) render(frame string) string {
+	style := lipgloss.NewStyle().Foreground(theme.CurrentTheme().Primary())
+	var result strings.Builder
+
+	for i, line := range strings.Split(frame, "\n") {
 		for _, char := range line {
 			switch char {
 			case 'x':
-				style := lipgloss.NewStyle().Foreground(t.Primary())
-				builder.WriteString(style.Render("█"))
+				result.WriteString(style.Render("█"))
 			case 'w':
-				style := lipgloss.NewStyle().Foreground(t.Primary())
-				builder.WriteString(style.Render("▌"))
+				result.WriteString(style.Render("▌"))
 			case 'c':
-				style := lipgloss.NewStyle().Foreground(t.Primary())
-				builder.WriteString(style.Render("▐"))
+				result.WriteString(style.Render("▐"))
 			case 'z':
-				style := lipgloss.NewStyle().Foreground(t.Primary())
-				builder.WriteString(style.Render("▀"))
+				result.WriteString(style.Render("▀"))
 			case 's':
-				style := lipgloss.NewStyle().Foreground(t.Primary())
-				builder.WriteString(style.Render("▄"))
+				result.WriteString(style.Render("▄"))
 			case '.':
-				builder.WriteString(" ")
+				result.WriteString(" ")
 			default:
-				builder.WriteString(string(char))
+				result.WriteString(string(char))
 			}
 		}
-		if i < len(lines)-1 {
-			builder.WriteString("\n")
+		if i < len(strings.Split(frame, "\n"))-1 {
+			result.WriteString("\n")
 		}
 	}
-	return builder.String()
+	return result.String()
 }
 
-func ParseFramesMD(md string) []string {
+func parseFrames(data string) []string {
+	// Remove /* */ comments
+	commentRegex := regexp.MustCompile(`/\*.*?\*/`)
+	data = commentRegex.ReplaceAllString(data, "")
+
 	var frames []string
 	var frameLines []string
-	for _, line := range strings.Split(md, "\n") {
-		trim := strings.TrimSpace(line)
-		if trim == "---" {
+
+	for _, line := range strings.Split(data, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "---" {
 			if len(frameLines) > 0 {
 				frames = append(frames, strings.Join(frameLines, "\n"))
 				frameLines = frameLines[:0]
 			}
-			continue
+		} else if line != "" {
+			frameLines = append(frameLines, line)
 		}
-		if trim == "" {
-			continue
-		}
-		frameLines = append(frameLines, line)
 	}
+
 	if len(frameLines) > 0 {
 		frames = append(frames, strings.Join(frameLines, "\n"))
 	}
