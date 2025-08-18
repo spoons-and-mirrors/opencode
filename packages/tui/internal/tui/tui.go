@@ -881,9 +881,13 @@ func (a Model) View() (string, *tea.Cursor) {
 		mainLayout = util.ConvertRGBToAnsi16Colors(mainLayout)
 	}
 
-	cursor := a.editor.Cursor()
-	cursor.Position.X += editorX
-	cursor.Position.Y += editorY
+	var cursor *tea.Cursor
+	if a.modal == nil {
+		// Only show cursor when no modal is open
+		cursor = a.editor.Cursor()
+		cursor.Position.X += editorX
+		cursor.Position.Y += editorY
+	}
 
 	return mainLayout + "\n" + a.status.View(), cursor
 }
