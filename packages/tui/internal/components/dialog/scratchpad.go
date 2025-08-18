@@ -117,6 +117,7 @@ func NewScratchpadDialog(app *app.App) ScratchpadDialog {
 	ta.Focus()
 	ta.CharLimit = 5000
 	ta.Placeholder = "Your session scratchpad...\n\nWrite anything here: todos, notes, ideas, system prompt extension etc. This scratchpad is saved with the session and is shared with the agent."
+	ta.Prompt = "" // Remove the prompt border
 
 	// Style the textarea
 	ta.Styles.Focused.CursorLine = styles.NewStyle().Background(bgColor).Lipgloss()
@@ -124,10 +125,18 @@ func NewScratchpadDialog(app *app.App) ScratchpadDialog {
 	ta.Styles.Focused.Base = styles.NewStyle().
 		Foreground(textColor).
 		Background(bgColor).
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(false).
+		BorderRight(false).
 		Lipgloss()
 	ta.Styles.Blurred.Base = styles.NewStyle().
 		Foreground(textMutedColor).
 		Background(bgColor).
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(false).
+		BorderRight(false).
 		Lipgloss()
 
 	return &scratchpadDialog{

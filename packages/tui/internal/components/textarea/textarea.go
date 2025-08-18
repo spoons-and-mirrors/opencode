@@ -1854,7 +1854,7 @@ func (m Model) lineNumberView(n int, isCursorLine bool) (str string) {
 
 	// Format line number dynamically based on the maximum number of lines.
 	digits := len(strconv.Itoa(m.MaxHeight))
-	str = fmt.Sprintf(" %*v ", digits, str)
+	str = fmt.Sprintf("%*v ", digits, str)
 
 	return textStyle.Render(lineNumberStyle.Render(str))
 }
