@@ -292,6 +292,11 @@ func (m *modelDialog) buildSearchResults(query string) []list.Item {
 		searchStr = fmt.Sprintf("%s %s", model.Provider.Name, model.Model.Name)
 		modelNames = append(modelNames, searchStr)
 		modelMap[searchStr] = model
+
+		// Provider name only (for provider-specific searches)
+		providerOnly := model.Provider.Name
+		modelNames = append(modelNames, providerOnly)
+		modelMap[providerOnly] = model
 	}
 
 	matches := fuzzy.RankFindFold(query, modelNames)
