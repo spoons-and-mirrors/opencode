@@ -1208,12 +1208,12 @@ func (m *messagesComponent) UndoLastPart() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Call the session removePart API to surgically remove the part
+	// Call the session revert API to surgically remove the part
 	return m, func() tea.Msg {
-		response, err := m.app.Client.Session.RemovePart(
+		response, err := m.app.Client.Session.Revert(
 			context.Background(),
 			m.app.Session.ID,
-			opencode.SessionRemovePartParams{
+			opencode.SessionRevertParams{
 				MessageID: opencode.F(lastPartMessageID),
 				PartID:    opencode.F(lastPartID),
 			},
@@ -1230,9 +1230,9 @@ func (m *messagesComponent) UndoLastPart() (tea.Model, tea.Cmd) {
 }
 
 func (m *messagesComponent) RedoLastPart() (tea.Model, tea.Cmd) {
-	// Call the session restorePart API to restore the most recently removed part
+	// Call the session unrevert API to restore the most recently removed part
 	return m, func() tea.Msg {
-		response, err := m.app.Client.Session.RestorePart(
+		response, err := m.app.Client.Session.Unrevert(
 			context.Background(),
 			m.app.Session.ID,
 		)

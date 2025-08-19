@@ -178,30 +178,6 @@ func (r *SessionService) Revert(ctx context.Context, id string, body SessionReve
 	return
 }
 
-// Remove a single part from a message
-func (r *SessionService) RemovePart(ctx context.Context, id string, body SessionRemovePartParams, opts ...option.RequestOption) (res *Session, err error) {
-	opts = append(r.Options[:], opts...)
-	if id == "" {
-		err = errors.New("missing required id parameter")
-		return
-	}
-	path := fmt.Sprintf("session/%s/remove-part", id)
-	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, &res, opts...)
-	return
-}
-
-// Restore the most recently removed part
-func (r *SessionService) RestorePart(ctx context.Context, id string, opts ...option.RequestOption) (res *Session, err error) {
-	opts = append(r.Options[:], opts...)
-	if id == "" {
-		err = errors.New("missing required id parameter")
-		return
-	}
-	path := fmt.Sprintf("session/%s/restore-part", id)
-	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
-	return
-}
-
 // Share a session
 func (r *SessionService) Share(ctx context.Context, id string, opts ...option.RequestOption) (res *Session, err error) {
 	opts = append(r.Options[:], opts...)
@@ -2436,15 +2412,6 @@ type SessionRevertParams struct {
 }
 
 func (r SessionRevertParams) MarshalJSON() (data []byte, err error) {
-	return apijson.MarshalRoot(r)
-}
-
-type SessionRemovePartParams struct {
-	MessageID param.Field[string] `json:"messageID,required"`
-	PartID    param.Field[string] `json:"partID,required"`
-}
-
-func (r SessionRemovePartParams) MarshalJSON() (data []byte, err error) {
 	return apijson.MarshalRoot(r)
 }
 
