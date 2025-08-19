@@ -32,6 +32,7 @@ type App struct {
 	Providers         []opencode.Provider
 	Version           string
 	StatePath         string
+	PromptHistoryPath string
 	Config            *opencode.Config
 	Client            *opencode.Client
 	State             *State
@@ -124,6 +125,14 @@ func New(
 		SaveState(appStatePath, appState)
 	}
 
+	// Load project-specific prompt history
+	promptHistoryPath := appInfo.Path.PromptHistory
+	promptHistory, err := LoadPromptHistory(promptHistoryPath)
+	if err != nil {
+		promptHistory = make([]Prompt, 0)
+	}
+	appState.MessageHistory = promptHistory
+
 	if appState.AgentModel == nil {
 		appState.AgentModel = make(map[string]AgentModel)
 	}
@@ -184,22 +193,23 @@ func New(
 	slog.Debug("Loaded config", "config", configInfo)
 
 	app := &App{
-		Info:           appInfo,
-		Agents:         agents,
-		Version:        version,
-		StatePath:      appStatePath,
-		Config:         configInfo,
-		State:          appState,
-		Client:         httpClient,
-		AgentIndex:     agentIndex,
-		Session:        &opencode.Session{},
-		Messages:       []Message{},
-		Commands:       commands.LoadFromConfig(configInfo),
-		InitialModel:   initialModel,
-		InitialPrompt:  initialPrompt,
-		InitialAgent:   initialAgent,
-		InitialSession: initialSession,
-		ScrollSpeed:    int(configInfo.Tui.ScrollSpeed),
+		Info:              appInfo,
+		Agents:            agents,
+		Version:           version,
+		StatePath:         appStatePath,
+		PromptHistoryPath: appInfo.Path.PromptHistory,
+		Config:            configInfo,
+		State:             appState,
+		Client:            httpClient,
+		AgentIndex:        agentIndex,
+		Session:           &opencode.Session{},
+		Messages:          []Message{},
+		Commands:          commands.LoadFromConfig(configInfo),
+		InitialModel:      initialModel,
+		InitialPrompt:     initialPrompt,
+		InitialAgent:      initialAgent,
+		InitialSession:    initialSession,
+		ScrollSpeed:       int(configInfo.Tui.ScrollSpeed),
 	}
 
 	return app, nil
@@ -671,10 +681,20 @@ func (a *App) HasAnimatingWork() bool {
 
 func (a *App) SaveState() tea.Cmd {
 	return func() tea.Msg {
-		err := SaveState(a.StatePath, a.State)
+		// Save main state (without prompt history)
+		stateToSave := *a.State
+		stateToSave.MessageHistory = make([]Prompt, 0) // Don't save prompt history in main state
+		err := SaveState(a.StatePath, &stateToSave)
 		if err != nil {
 			slog.Error("Failed to save state", "error", err)
 		}
+
+		// Save prompt history separately
+		err = SavePromptHistory(a.PromptHistoryPath, a.State.MessageHistory)
+		if err != nil {
+			slog.Error("Failed to save prompt history", "error", err)
+		}
+
 		return nil
 	}
 }

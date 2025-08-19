@@ -248,23 +248,25 @@ func (r appJSON) RawJSON() string {
 }
 
 type AppPath struct {
-	Config string      `json:"config,required"`
-	Cwd    string      `json:"cwd,required"`
-	Data   string      `json:"data,required"`
-	Root   string      `json:"root,required"`
-	State  string      `json:"state,required"`
-	JSON   appPathJSON `json:"-"`
+	Config        string      `json:"config,required"`
+	Cwd           string      `json:"cwd,required"`
+	Data          string      `json:"data,required"`
+	Root          string      `json:"root,required"`
+	State         string      `json:"state,required"`
+	PromptHistory string      `json:"promptHistory,required"`
+	JSON          appPathJSON `json:"-"`
 }
 
 // appPathJSON contains the JSON metadata for the struct [AppPath]
 type appPathJSON struct {
-	Config      apijson.Field
-	Cwd         apijson.Field
-	Data        apijson.Field
-	Root        apijson.Field
-	State       apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
+	Config        apijson.Field
+	Cwd           apijson.Field
+	Data          apijson.Field
+	Root          apijson.Field
+	State         apijson.Field
+	PromptHistory apijson.Field
+	raw           string
+	ExtraFields   map[string]apijson.Field
 }
 
 func (r *AppPath) UnmarshalJSON(data []byte) (err error) {

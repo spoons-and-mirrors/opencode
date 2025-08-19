@@ -20,6 +20,7 @@ export namespace App {
         root: z.string(),
         cwd: z.string(),
         state: z.string(),
+        promptHistory: z.string(),
       }),
       time: z.object({
         initialized: z.number().optional(),
@@ -80,6 +81,7 @@ export namespace App {
         data,
         root,
         cwd: input.cwd,
+        promptHistory: path.join(data, "prompt-history"),
       },
     }
     const app = {

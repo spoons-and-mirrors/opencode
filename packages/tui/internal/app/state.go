@@ -172,3 +172,37 @@ func LoadState(filePath string) (*State, error) {
 
 	return &state, nil
 }
+
+// LoadPromptHistory loads prompt history from a separate project-specific file
+func LoadPromptHistory(filePath string) ([]Prompt, error) {
+	var history struct {
+		MessageHistory []Prompt `toml:"message_history"`
+	}
+	if _, err := toml.DecodeFile(filePath, &history); err != nil {
+		return make([]Prompt, 0), nil // Return empty on any error
+	}
+	for _, prompt := range history.MessageHistory {
+		for _, att := range prompt.Attachments {
+			att.RestoreSourceType()
+		}
+	}
+	return history.MessageHistory, nil
+}
+
+// SavePromptHistory saves prompt history to a separate project-specific file
+func SavePromptHistory(filePath string, history []Prompt) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	err = toml.NewEncoder(writer).Encode(struct {
+		MessageHistory []Prompt `toml:"message_history"`
+	}{history})
+	if err != nil {
+		return err
+	}
+	return writer.Flush()
+}
