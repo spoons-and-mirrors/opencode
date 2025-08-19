@@ -1450,23 +1450,19 @@ export namespace Session {
   export type RevertInput = z.infer<typeof RevertInput>
 
   async function removePartFromSession(sessionID: string, messageID: string, partID: string) {
-    // Get all messages for the session
     const msgs = await messages(sessionID)
-
-    // Find the target message
     const targetMessage = msgs.find((msg) => msg.info.id === messageID)
     if (!targetMessage) {
       throw new Error(`Message ${messageID} not found`)
     }
 
-    // Find the target part and its index
     const targetPartIndex = targetMessage.parts.findIndex((part) => part.id === partID)
     if (targetPartIndex === -1) {
       throw new Error(`Part ${partID} not found in message ${messageID}`)
     }
     const targetPart = targetMessage.parts[targetPartIndex]
 
-    // Collect all patch parts that come after this part to revert file changes
+    // Collect patch parts that come after this part to revert file changes
     const patches: MessageV2.PatchPart[] = []
     let foundTargetPart = false
 
@@ -1483,8 +1479,8 @@ export namespace Session {
     }
 
     // Handle file changes if needed
-    let snapshot: string | undefined = undefined
-    let diff: string | undefined = undefined
+    let snapshot: string | undefined
+    let diff: string | undefined
     if (patches.length > 0) {
       snapshot = await Snapshot.track()
       await Snapshot.revert(patches)
@@ -1576,38 +1572,25 @@ export namespace Session {
     const session = await get(input.sessionID)
 
     // Check if there are any removed parts to restore (part-level undo)
-    if (session.removedParts && session.removedParts.length > 0) {
-      // Get the most recently removed part (last in array)
+    if (session.removedParts?.length > 0) {
       const removedPart = session.removedParts[session.removedParts.length - 1]
 
-      // If we reverted patches when removing this part, restore them
       if (removedPart.snapshot) {
         await Snapshot.restore(removedPart.snapshot)
       }
 
-      // Get all messages for the session
       const msgs = await messages(input.sessionID)
-
-      // Find the target message
       const targetMessage = msgs.find((msg) => msg.info.id === removedPart.messageID)
       if (!targetMessage) {
         throw new Error(`Message ${removedPart.messageID} not found`)
       }
 
-      // Insert the part back at its original position
       targetMessage.parts.splice(removedPart.originalIndex, 0, removedPart.partData as MessageV2.Part)
-
-      // Update the message in storage
       await updateMessage(targetMessage.info)
-
-      // Store the part back in storage
       await updatePart(removedPart.partData as MessageV2.Part)
 
-      // Remove the restored part from the removedParts array
       await update(input.sessionID, (draft) => {
-        if (draft.removedParts) {
-          draft.removedParts.pop() // Remove the last (most recent) item
-        }
+        draft.removedParts?.pop()
       })
 
       return await get(input.sessionID)
