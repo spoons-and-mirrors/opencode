@@ -173,6 +173,24 @@ Any file changes will also be restored.
 
 ---
 
+### Part-Level Undo/Redo
+
+Opencode also supports fine-grained undo/redo operations at the individual part level within messages. This allows you to selectively remove or restore sequential parts (like tool calls or text blocks) without affecting the entire message.
+
+#### Undo Last Part
+
+Remove the most recently generated part from the conversation. Any associated file changes are automatically reverted.
+
+**Keybind:** `<ctrl+x> U` (uppercase U)
+
+#### Redo Last Part
+
+Restore the most recently removed part and any associated file changes.
+
+**Keybind:** `ctrl+x R` (uppercase R)
+
+---
+
 ### sessions
 
 List and switch between sessions. _Aliases_: `/resume`, `/continue`
