@@ -1449,90 +1449,83 @@ export namespace Session {
   })
   export type RevertInput = z.infer<typeof RevertInput>
 
+  async function removePartFromSession(sessionID: string, messageID: string, partID: string) {
+    // Get all messages for the session
+    const msgs = await messages(sessionID)
+
+    // Find the target message
+    const targetMessage = msgs.find((msg) => msg.info.id === messageID)
+    if (!targetMessage) {
+      throw new Error(`Message ${messageID} not found`)
+    }
+
+    // Find the target part and its index
+    const targetPartIndex = targetMessage.parts.findIndex((part) => part.id === partID)
+    if (targetPartIndex === -1) {
+      throw new Error(`Part ${partID} not found in message ${messageID}`)
+    }
+    const targetPart = targetMessage.parts[targetPartIndex]
+
+    // Collect all patch parts that come after this part to revert file changes
+    const patches: MessageV2.PatchPart[] = []
+    let foundTargetPart = false
+
+    for (const msg of msgs) {
+      for (const part of msg.parts) {
+        if (part.id === partID) {
+          foundTargetPart = true
+          continue
+        }
+        if (foundTargetPart && part.type === "patch") {
+          patches.push(part as MessageV2.PatchPart)
+        }
+      }
+    }
+
+    // Handle file changes if needed
+    let snapshot: string | undefined = undefined
+    let diff: string | undefined = undefined
+    if (patches.length > 0) {
+      snapshot = await Snapshot.track()
+      await Snapshot.revert(patches)
+      if (snapshot) diff = await Snapshot.diff(snapshot)
+    }
+
+    // Remove the part from the message and storage
+    targetMessage.parts = targetMessage.parts.filter((part) => part.id !== partID)
+    await updateMessage(targetMessage.info)
+    await Storage.remove(`session/part/${sessionID}/${messageID}/${partID}`)
+
+    // Track the removed part for redo functionality
+    await update(sessionID, (draft) => {
+      if (!draft.removedParts) draft.removedParts = []
+      draft.removedParts.push({
+        messageID,
+        partID,
+        partData: targetPart,
+        originalIndex: targetPartIndex,
+        snapshot,
+        diff,
+        revertedPatches: patches,
+      })
+    })
+
+    // Publish event for UI updates
+    await Bus.publish(MessageV2.Event.PartRemoved, {
+      sessionID,
+      messageID,
+      partID,
+    })
+
+    return await get(sessionID)
+  }
+
   export async function revert(input: RevertInput) {
     log.info("reverting", input)
 
-    // If partID is specified, do part-level revert using stack-based approach
+    // If partID is specified, do part-level revert
     if (input.partID) {
-      // Get all messages for the session
-      const msgs = await messages(input.sessionID)
-
-      // Find the target message
-      const targetMessage = msgs.find((msg) => msg.info.id === input.messageID)
-      if (!targetMessage) {
-        throw new Error(`Message ${input.messageID} not found`)
-      }
-
-      // Find the target part and its index
-      const targetPartIndex = targetMessage.parts.findIndex((part) => part.id === input.partID)
-      if (targetPartIndex === -1) {
-        throw new Error(`Part ${input.partID} not found in message ${input.messageID}`)
-      }
-      const targetPart = targetMessage.parts[targetPartIndex]
-
-      // Collect all patch parts that come after this part to revert file changes
-      const patches: MessageV2.PatchPart[] = []
-      let foundTargetPart = false
-
-      for (const msg of msgs) {
-        for (const part of msg.parts) {
-          // Once we find the target part, start collecting patches
-          if (part.id === input.partID) {
-            foundTargetPart = true
-            continue
-          }
-
-          // Collect all patches that come after the target part
-          if (foundTargetPart && part.type === "patch") {
-            patches.push(part as MessageV2.PatchPart)
-          }
-        }
-      }
-
-      // If there are patches to revert (meaning this part caused file changes),
-      // track snapshot and revert the patches
-      let snapshot: string | undefined = undefined
-      let diff: string | undefined = undefined
-      if (patches.length > 0) {
-        // Track snapshot before reverting
-        snapshot = await Snapshot.track()
-        // Revert all patches that came after this part
-        await Snapshot.revert(patches)
-        // Get the diff for UI/redo
-        if (snapshot) diff = await Snapshot.diff(snapshot)
-      }
-
-      // Remove the part from the message
-      targetMessage.parts = targetMessage.parts.filter((part) => part.id !== input.partID)
-
-      // Update the message in storage
-      await updateMessage(targetMessage.info)
-
-      // Remove the part from storage
-      await Storage.remove(`session/part/${input.sessionID}/${input.messageID}/${input.partID}`)
-
-      // Track the removed part for redo functionality
-      await update(input.sessionID, (draft) => {
-        if (!draft.removedParts) draft.removedParts = []
-        draft.removedParts.push({
-          messageID: input.messageID,
-          partID: input.partID!,
-          partData: targetPart,
-          originalIndex: targetPartIndex,
-          snapshot,
-          diff,
-          revertedPatches: patches,
-        })
-      })
-
-      // Publish event for UI updates
-      await Bus.publish(MessageV2.Event.PartRemoved, {
-        sessionID: input.sessionID,
-        messageID: input.messageID,
-        partID: input.partID!,
-      })
-
-      return await get(input.sessionID)
+      return removePartFromSession(input.sessionID, input.messageID, input.partID)
     }
 
     // Original message-level revert logic
@@ -1615,13 +1608,6 @@ export namespace Session {
         if (draft.removedParts) {
           draft.removedParts.pop() // Remove the last (most recent) item
         }
-      })
-
-      // Publish event for UI updates
-      await Bus.publish(MessageV2.Event.PartAdded, {
-        sessionID: input.sessionID,
-        messageID: removedPart.messageID,
-        partID: removedPart.partID,
       })
 
       return await get(input.sessionID)

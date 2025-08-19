@@ -1161,38 +1161,48 @@ func (m *messagesComponent) UndoLastPart() (tea.Model, tea.Cmd) {
 	var lastPartID string
 	var revertedMessage app.Message
 
+	// Helper function to extract part ID using reflection-like approach
+	getPartID := func(part interface{}) string {
+		switch p := part.(type) {
+		case opencode.ToolPart:
+			return p.ID
+		case opencode.TextPart:
+			return p.ID
+		case opencode.FilePart:
+			return p.ID
+		case opencode.AgentPart:
+			return p.ID
+		case opencode.ReasoningPart:
+			return p.ID
+		default:
+			return ""
+		}
+	}
+
+	// Helper function to extract message ID
+	getMessageID := func(info interface{}) string {
+		switch casted := info.(type) {
+		case opencode.UserMessage:
+			return casted.ID
+		case opencode.AssistantMessage:
+			return casted.ID
+		default:
+			return ""
+		}
+	}
+
 	// Traverse messages in reverse order (most recent first)
 	for i := len(m.app.Messages) - 1; i >= 0; i-- {
 		message := m.app.Messages[i]
 
 		// Traverse parts in reverse order (most recent first)
 		for j := len(message.Parts) - 1; j >= 0; j-- {
-			part := message.Parts[j]
-			// Found the most recent part (any type)
-			switch p := part.(type) {
-			case opencode.ToolPart:
-				lastPartID = p.ID
-			case opencode.TextPart:
-				lastPartID = p.ID
-			case opencode.FilePart:
-				lastPartID = p.ID
-			case opencode.AgentPart:
-				lastPartID = p.ID
-			case opencode.ReasoningPart:
-				lastPartID = p.ID
-			default:
-				continue // Skip unknown part types
+			if partID := getPartID(message.Parts[j]); partID != "" {
+				lastPartID = partID
+				lastPartMessageID = getMessageID(message.Info)
+				revertedMessage = message
+				break
 			}
-
-			// Get message ID from the message info
-			switch casted := message.Info.(type) {
-			case opencode.UserMessage:
-				lastPartMessageID = casted.ID
-			case opencode.AssistantMessage:
-				lastPartMessageID = casted.ID
-			}
-			revertedMessage = message
-			break
 		}
 
 		// If we found a part, stop searching

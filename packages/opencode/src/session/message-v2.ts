@@ -328,14 +328,6 @@ export namespace MessageV2 {
         partID: z.string(),
       }),
     ),
-    PartAdded: Bus.event(
-      "message.part.added",
-      z.object({
-        sessionID: z.string(),
-        messageID: z.string(),
-        partID: z.string(),
-      }),
-    ),
   }
 
   export function fromV1(v1: Message.Info) {
