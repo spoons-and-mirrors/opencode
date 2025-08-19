@@ -75,6 +75,33 @@ Your editor should be able to validate and autocomplete based on the schema.
 
 You can configure the providers and models you want to use in your opencode config through the `provider`, `model` and `small_model` options.
 
+---
+
+### Rate Limiting Configuration
+
+You can limit the number of requests per minute (RPM) for any provider/model pair using the `rate_limit` option. This helps prevent hitting API rate limits and allows you to control usage for cost or quota management.
+
+```json title="opencode.json"
+{
+  "provider": {
+    "google": {
+      "models": {
+        "gemini-2.5-pro": {
+          "limit": {
+            "rpm": 10
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+- `limit.rpm`: Maximum requests per minute for this model. If the limit is reached, opencode will automatically pause and resume requests as needed.
+
+Note: rate limiting detection uses a sliding window
+---
+
 ```json title="opencode.json"
 {
   "$schema": "https://opencode.ai/config.json",
@@ -264,7 +291,6 @@ The `disabled_providers` option accepts an array of provider IDs. When a provide
 - It won't be loaded even if environment variables are set
 - It won't be loaded even if API keys are configured through `opencode auth login`
 - The provider's models won't appear in the model selection list
-
 
 ```json title="opencode.json"
 {

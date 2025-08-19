@@ -76,6 +76,10 @@ func (m *editorComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width - 4
 		return m, nil
 	case spinner.TickMsg:
+		// Refresh app info when busy to get latest rate limit status
+		if m.app.IsBusy() {
+			m.app.RefreshAppInfo()
+		}
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	case tea.KeyPressMsg:
@@ -380,6 +384,12 @@ func (m *editorComponent) Content() string {
 		status := "working"
 		if m.app.CurrentPermission.ID != "" {
 			status = "waiting for permission"
+		} else if m.app.RateLimited {
+			if m.app.RateLimitWaitSeconds > 0 {
+				status = fmt.Sprintf("waiting %ds", m.app.RateLimitWaitSeconds)
+			} else {
+				status = "rate limited"
+			}
 		}
 		if m.interruptKeyInDebounce && m.app.CurrentPermission.ID == "" {
 			bright := t.Accent()

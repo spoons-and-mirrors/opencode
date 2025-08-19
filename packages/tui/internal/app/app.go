@@ -27,34 +27,51 @@ type Message struct {
 }
 
 type App struct {
-	Info              opencode.App
-	Agents            []opencode.Agent
-	Providers         []opencode.Provider
-	Version           string
-	StatePath         string
-	Config            *opencode.Config
-	Client            *opencode.Client
-	State             *State
-	AgentIndex        int
-	Provider          *opencode.Provider
-	Model             *opencode.Model
-	Session           *opencode.Session
-	Messages          []Message
-	Permissions       []opencode.Permission
-	CurrentPermission opencode.Permission
-	Commands          commands.CommandRegistry
-	InitialModel      *string
-	InitialPrompt     *string
-	InitialAgent      *string
-	InitialSession    *string
-	compactCancel     context.CancelFunc
-	IsLeaderSequence  bool
-	IsBashMode        bool
-	ScrollSpeed       int
+	Info                 opencode.App
+	Agents               []opencode.Agent
+	Providers            []opencode.Provider
+	Version              string
+	StatePath            string
+	Config               *opencode.Config
+	Client               *opencode.Client
+	State                *State
+	AgentIndex           int
+	Provider             *opencode.Provider
+	Model                *opencode.Model
+	Session              *opencode.Session
+	Messages             []Message
+	Permissions          []opencode.Permission
+	CurrentPermission    opencode.Permission
+	Commands             commands.CommandRegistry
+	InitialModel         *string
+	InitialPrompt        *string
+	InitialAgent         *string
+	InitialSession       *string
+	compactCancel        context.CancelFunc
+	IsLeaderSequence     bool
+	IsBashMode           bool
+	ScrollSpeed          int
+	RateLimited          bool
+	RateLimitedProvider  string
+	RateLimitWaitSeconds int
 }
 
 func (a *App) Agent() *opencode.Agent {
 	return &a.Agents[a.AgentIndex]
+}
+
+func (a *App) RefreshAppInfo() {
+	appInfo, err := a.Client.App.Get(context.Background())
+	if err != nil {
+		// Don't log this error as it might be too frequent during normal operation
+		return
+	}
+
+	a.Info = *appInfo
+	// Sync the backend fields to our local fields
+	a.RateLimited = appInfo.RateLimited
+	a.RateLimitedProvider = appInfo.RateLimitedProvider
+	a.RateLimitWaitSeconds = appInfo.RateLimitWaitSeconds
 }
 
 type SessionCreatedMsg = struct {

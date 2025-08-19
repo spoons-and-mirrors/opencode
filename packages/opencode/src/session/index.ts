@@ -17,6 +17,7 @@ import {
 
 import PROMPT_INITIALIZE from "../session/prompt/initialize.txt"
 import PROMPT_PLAN from "../session/prompt/plan.txt"
+import { RateLimiter } from "../util/rate-limiter"
 
 import { App } from "../app/app"
 import { Bus } from "../bus"
@@ -408,6 +409,7 @@ export namespace Session {
     l.info("chatting")
 
     const inputAgent = input.agent ?? "build"
+    const config = await Config.get()
 
     // Process revert cleanup first, before creating new messages
     const session = await get(input.sessionID)
@@ -673,6 +675,11 @@ export namespace Session {
 
     if (msgs.filter((m) => m.info.role === "user").length === 1 && !session.parentID && isDefaultTitle(session.title)) {
       const small = (await Provider.getSmallModel(input.providerID)) ?? model
+
+      // Apply rate limiting for title generation
+      const config = await Config.get()
+      await RateLimiter.checkRateLimit(input.providerID, input.modelID, config)
+
       generateText({
         maxOutputTokens: small.info.reasoning ? 1024 : 20,
         providerOptions: {
@@ -981,6 +988,9 @@ export namespace Session {
         middleware: [
           {
             async transformParams(args) {
+              // Apply rate limiting before each request
+              await RateLimiter.checkRateLimit(input.providerID, input.modelID, config)
+
               if (args.type === "stream") {
                 // @ts-expect-error
                 args.params.prompt = ProviderTransform.message(args.params.prompt, input.providerID, input.modelID)

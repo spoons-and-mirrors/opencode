@@ -222,21 +222,27 @@ func (r agentModelJSON) RawJSON() string {
 }
 
 type App struct {
-	Git      bool    `json:"git,required"`
-	Hostname string  `json:"hostname,required"`
-	Path     AppPath `json:"path,required"`
-	Time     AppTime `json:"time,required"`
-	JSON     appJSON `json:"-"`
+	Git                  bool    `json:"git,required"`
+	Hostname             string  `json:"hostname,required"`
+	Path                 AppPath `json:"path,required"`
+	Time                 AppTime `json:"time,required"`
+	RateLimited          bool    `json:"rateLimited,omitempty"`
+	RateLimitedProvider  string  `json:"rateLimitedProvider,omitempty"`
+	RateLimitWaitSeconds int     `json:"rateLimitWaitSeconds,omitempty"`
+	JSON                 appJSON `json:"-"`
 }
 
 // appJSON contains the JSON metadata for the struct [App]
 type appJSON struct {
-	Git         apijson.Field
-	Hostname    apijson.Field
-	Path        apijson.Field
-	Time        apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
+	Git                  apijson.Field
+	Hostname             apijson.Field
+	Path                 apijson.Field
+	Time                 apijson.Field
+	RateLimited          apijson.Field
+	RateLimitedProvider  apijson.Field
+	RateLimitWaitSeconds apijson.Field
+	raw                  string
+	ExtraFields          map[string]apijson.Field
 }
 
 func (r *App) UnmarshalJSON(data []byte) (err error) {

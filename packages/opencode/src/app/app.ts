@@ -3,6 +3,7 @@ import { Log } from "../util/log"
 import { Context } from "../util/context"
 import { Filesystem } from "../util/filesystem"
 import { Global } from "../global"
+import { RateLimiter } from "../util/rate-limiter"
 import path from "path"
 import os from "os"
 import { z } from "zod"
@@ -24,6 +25,9 @@ export namespace App {
       time: z.object({
         initialized: z.number().optional(),
       }),
+      rateLimited: z.boolean().optional(),
+      rateLimitedProvider: z.string().optional(),
+      rateLimitWaitSeconds: z.number().optional(),
     })
     .openapi({
       ref: "App",
@@ -121,7 +125,13 @@ export namespace App {
   }
 
   export function info() {
-    return ctx.use().info
+    const appInfo = ctx.use().info
+    return {
+      ...appInfo,
+      rateLimited: RateLimiter.isCurrentlyRateLimited(),
+      rateLimitedProvider: RateLimiter.getRateLimitedProvider(),
+      rateLimitWaitSeconds: RateLimiter.getCurrentWaitTime(),
+    }
   }
 
   export async function initialize() {

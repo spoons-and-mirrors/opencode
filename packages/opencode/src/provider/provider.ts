@@ -217,11 +217,11 @@ export namespace Provider {
             ...existing?.options,
             ...model.options,
           },
-          limit: model.limit ??
-            existing?.limit ?? {
-              context: 0,
-              output: 0,
-            },
+          limit: {
+            context: model.limit?.context ?? existing?.limit?.context ?? 0,
+            output: model.limit?.output ?? existing?.limit?.output ?? 0,
+            ...(model.limit?.rpm !== undefined && { rpm: model.limit.rpm }),
+          },
         }
         parsed.models[modelID] = parsedModel
       }

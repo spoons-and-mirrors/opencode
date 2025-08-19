@@ -349,7 +349,18 @@ export namespace Config {
         .record(
           ModelsDev.Provider.partial()
             .extend({
-              models: z.record(ModelsDev.Model.partial()).optional(),
+              models: z
+                .record(
+                  ModelsDev.Model.partial().extend({
+                    limit: ModelsDev.Model.shape.limit
+                      .partial()
+                      .extend({
+                        rpm: z.number().int().positive().optional(),
+                      })
+                      .optional(),
+                  }),
+                )
+                .optional(),
               options: z
                 .object({
                   apiKey: z.string().optional(),

@@ -27,6 +27,7 @@ export namespace ModelsDev {
       limit: z.object({
         context: z.number(),
         output: z.number(),
+        rpm: z.number().int().positive().optional(),
       }),
       options: z.record(z.any()),
     })

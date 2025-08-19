@@ -6,6 +6,7 @@ import { generateObject, type ModelMessage } from "ai"
 import PROMPT_GENERATE from "./generate.txt"
 import { SystemPrompt } from "../session/system"
 import { mergeDeep } from "remeda"
+import { RateLimiter } from "../util/rate-limiter"
 
 export namespace Agent {
   export const Info = z
@@ -141,6 +142,11 @@ export namespace Agent {
   export async function generate(input: { description: string }) {
     const defaultModel = await Provider.defaultModel()
     const model = await Provider.getModel(defaultModel.providerID, defaultModel.modelID)
+
+    // Apply rate limiting before the request
+    const config = await Config.get()
+    await RateLimiter.checkRateLimit(defaultModel.providerID, defaultModel.modelID, config)
+
     const system = SystemPrompt.header(defaultModel.providerID)
     system.push(PROMPT_GENERATE)
     const existing = await list()
