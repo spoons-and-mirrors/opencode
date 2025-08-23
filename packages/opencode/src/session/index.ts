@@ -1177,7 +1177,32 @@ export namespace Session {
       command.model ??
       (await Agent.get(agent).then((x) => (x.model ? `${x.model.providerID}/${x.model.modelID}` : undefined))) ??
       (await Provider.defaultModel().then((x) => `${x.providerID}/${x.modelID}`))
-    let template = command.template.replace("$ARGUMENTS", input.arguments)
+    const args = input.arguments.split(/\s+/)
+    let template = command.template.replace(
+      /\$ARGUMENTS\[(\d+)(?:(\*)|(\+)|(\+\+)|:(\d+))?\]/g,
+      (_, index, star, plus, doublePlus, end) => {
+        const start = parseInt(index)
+        switch (star ? "star" : doublePlus ? "doublePlus" : plus ? "plus" : end ? "range" : "single") {
+          case "star":
+            // $ARGUMENTS[1*] - all from index onwards
+            return args.slice(start).join(" ")
+          case "doublePlus":
+            // $ARGUMENTS[1++] - index, index+1, index+2
+            return args.slice(start, start + 3).join(" ")
+          case "plus":
+            // $ARGUMENTS[1+] - index, index+1
+            return args.slice(start, start + 2).join(" ")
+          case "range":
+            // $ARGUMENTS[1:5] - range from index to end
+            return args.slice(start, parseInt(end) + 1).join(" ")
+          case "single":
+          default:
+            // $ARGUMENTS[1] - single index
+            return args[start] || ""
+        }
+      },
+    )
+    template = template.replace("$ARGUMENTS", input.arguments)
 
     const bash = Array.from(template.matchAll(bashRegex))
     if (bash.length > 0) {

@@ -36,7 +36,9 @@ Use the command by typing `/` followed by the command name.
 
 ## Use arguments
 
-Pass arguments to commands using the `$ARGUMENTS` placeholder.
+Pass arguments to commands using the `$ARGUMENTS` placeholder. Arguments are split by spaces and can be accessed individually or in groups.
+
+### Basic usage
 
 Create `.opencode/command/component.md`:
 
@@ -54,6 +56,45 @@ Run the command with arguments:
 ```bash frame="none"
 "/component Button"
 ```
+
+### Advanced argument patterns
+
+Access specific arguments using indexed placeholders:
+
+- **`$ARGUMENTS[n]`** - Single argument at index `n` (0-based)
+- **`$ARGUMENTS[n*]`** - All arguments from index `n` onwards
+- **`$ARGUMENTS[n+]`** - Arguments at index `n` and `n+1`
+- **`$ARGUMENTS[n++]`** - Arguments at index `n`, `n+1`, and `n+2`
+- **`$ARGUMENTS[n:m]`** - Range of arguments from index `n` to `m` (inclusive)
+
+Create `.opencode/command/hello.md`:
+
+```md title=".opencode/command/hello.md"
+---
+description: Demonstrate all argument splitting patterns
+---
+
+Argument Splitting Examples
+Command: `/hello hello world foo bar baz . -y`
+
+**Full arguments:** $ARGUMENTS
+
+**Single index [6]:** $ARGUMENTS[6] (7th argument)
+**Star pattern [1*]:** $ARGUMENTS[1*] (all from index 1 onwards)
+**Plus pattern [2+]:** $ARGUMENTS[2+] (index 2 and 3)
+**Double plus [3++]:** $ARGUMENTS[3++] (index 3, 4, and 5)
+**Range [1:4]:** $ARGUMENTS[1:4] (from index 1 to 4 inclusive)
+
+This demonstrates all available argument splitting patterns!
+```
+
+Run the command:
+
+```bash frame="none"
+"/hello hello world foo bar baz . -y"
+```
+
+This produces a comprehensive demonstration of all argument patterns in a single command!
 
 ---
 
