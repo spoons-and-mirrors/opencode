@@ -145,11 +145,25 @@ export namespace MCP {
 
   export async function tools() {
     const result: Record<string, Tool> = {}
+    const cfg = await Config.get()
     for (const [clientName, client] of Object.entries(await clients())) {
+      const serverConfig = (cfg.mcp ?? {})[clientName]
       for (const [toolName, tool] of Object.entries(await client.tools())) {
         const sanitizedClientName = clientName.replace(/\s+/g, "_")
         const sanitizedToolName = toolName.replace(/[-\s]+/g, "_")
-        result[sanitizedClientName + "_" + sanitizedToolName] = tool
+        const key = sanitizedClientName + "_" + sanitizedToolName
+
+        // per-server tool description override
+        let overriddenTool: Tool = tool
+        try {
+          const toolOverrides = serverConfig?.tools ?? {}
+          const override = toolOverrides?.[toolName] ?? toolOverrides?.[sanitizedToolName]
+          if (override?.description) {
+            overriddenTool = { ...tool, description: override.description }
+          }
+        } catch (err) {}
+
+        result[key] = overriddenTool
       }
     }
     return result

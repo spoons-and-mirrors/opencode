@@ -204,6 +204,17 @@ export namespace Config {
         .optional()
         .describe("Environment variables to set when running the MCP server"),
       enabled: z.boolean().optional().describe("Enable or disable the MCP server on startup"),
+      tools: z
+        .record(
+          z.string(),
+          z
+            .object({
+              description: z.string().optional(),
+            })
+            .optional(),
+        )
+        .optional()
+        .describe("Optional per-tool configuration and description overrides for this MCP server"),
     })
     .strict()
     .openapi({
@@ -216,6 +227,17 @@ export namespace Config {
       url: z.string().describe("URL of the remote MCP server"),
       enabled: z.boolean().optional().describe("Enable or disable the MCP server on startup"),
       headers: z.record(z.string(), z.string()).optional().describe("Headers to send with the request"),
+      tools: z
+        .record(
+          z.string(),
+          z
+            .object({
+              description: z.string().optional(),
+            })
+            .optional(),
+        )
+        .optional()
+        .describe("Optional per-tool configuration and description overrides for this MCP server"),
     })
     .strict()
     .openapi({
