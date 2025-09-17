@@ -403,18 +403,51 @@ export namespace Session {
       metadata: z.custom<ProviderMetadata>().optional(),
     }),
     (input) => {
+      const inRaw = input.usage.inputTokens ?? 0
+      const outRaw = input.usage.outputTokens ?? 0
+      const reas = input.usage.reasoningTokens ?? 0
+      const cacheRead = input.usage.cachedInputTokens ?? 0
+
+      let inEff = inRaw
+      let outEff = outRaw
+      let cacheWrite = 0
+
+      const record = input.metadata as Record<string, unknown> | undefined
+      let provider: "anthropic" | "bedrock" | "other" = "other"
+      if (record?.["anthropic"]) provider = "anthropic"
+      if (provider === "other" && record?.["bedrock"]) provider = "bedrock"
+
+      switch (provider) {
+        case "anthropic": {
+          const anthropic = record?.["anthropic"] as { cacheCreationInputTokens?: number } | undefined
+          cacheWrite = typeof anthropic?.cacheCreationInputTokens === "number" ? anthropic.cacheCreationInputTokens : 0
+          break
+        }
+        case "bedrock": {
+          const bedrock = record?.["bedrock"] as { usage?: { cacheWriteInputTokens?: number } } | undefined
+          const bedrockCacheWrite = bedrock?.usage?.cacheWriteInputTokens
+          cacheWrite = typeof bedrockCacheWrite === "number" ? bedrockCacheWrite : 0
+          break
+        }
+        default: {
+          inEff = inRaw - cacheRead
+          if (inEff < 0) inEff = 0
+          outEff = outRaw - reas
+          if (outEff < 0) outEff = 0
+          break
+        }
+      }
+
       const tokens = {
-        input: input.usage.inputTokens ?? 0,
-        output: input.usage.outputTokens ?? 0,
-        reasoning: input.usage?.reasoningTokens ?? 0,
+        input: inEff,
+        output: outEff,
+        reasoning: reas,
         cache: {
-          write: (input.metadata?.["anthropic"]?.["cacheCreationInputTokens"] ??
-            // @ts-expect-error
-            input.metadata?.["bedrock"]?.["usage"]?.["cacheWriteInputTokens"] ??
-            0) as number,
-          read: input.usage.cachedInputTokens ?? 0,
+          write: cacheWrite,
+          read: cacheRead,
         },
       }
+
       return {
         cost: new Decimal(0)
           .add(new Decimal(tokens.input).mul(input.model.cost?.input ?? 0).div(1_000_000))
