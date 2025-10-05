@@ -1,0 +1,12 @@
+Executes multiple independent tool calls concurrently instead of separate sequential calls. Use this tool when you have to execute multiple independent tool calls that do not depend on each other's output. Ideally suited for concurrent searches across different files, patterns or even multiple file edits.
+
+THE BATCH TOOL IS BY FAR THE USER'S PREFERRED WAY TO USE TOOLS
+
+Usage:
+- Batch your tool calls together for optimal performance
+- Expected payload formatting: [{"tool": "tool_name", "parameters": {...}},{...}]
+- One tool failure doesn't stop others from executing
+- DO NOT use for tools that depend on each other's output
+- DO NOT use the batch tool recursively
+- Tools you are not allowed to batch: [batch, todoread]
+- Batch tool usage has proven to yield efficiency gains from 3 to 10x

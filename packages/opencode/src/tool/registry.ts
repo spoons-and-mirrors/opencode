@@ -3,6 +3,7 @@ import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ListTool } from "./ls"
+import { BatchTool } from "./batch"
 import { PatchTool } from "./patch"
 import { ReadTool } from "./read"
 import { TaskTool } from "./task"
@@ -76,18 +77,19 @@ export namespace ToolRegistry {
     const custom = await state().then((x) => x.custom)
     return [
       InvalidTool,
-      BashTool,
-      EditTool,
-      WebFetchTool,
+      PatchTool,
+      BatchTool,
+      ReadTool,
       GlobTool,
       GrepTool,
       ListTool,
-      PatchTool,
-      ReadTool,
+      EditTool,
+      BashTool,
+      TaskTool,
       WriteTool,
+      WebFetchTool,
       TodoWriteTool,
       TodoReadTool,
-      TaskTool,
       ...custom,
     ]
   }

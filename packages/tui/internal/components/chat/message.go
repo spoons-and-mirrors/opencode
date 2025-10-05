@@ -466,6 +466,11 @@ func renderToolDetails(
 		return ""
 	}
 
+	// Hide batch tool only if it succeeded
+	if toolCall.Tool == "batch" && toolCall.State.Status != opencode.ToolPartStateStatusError {
+		return ""
+	}
+
 	if toolCall.State.Status == opencode.ToolPartStateStatusPending {
 		title := renderToolTitle(toolCall, width)
 		return renderContentBlock(app, title, width)
@@ -642,9 +647,9 @@ func renderToolDetails(
 				for _, item := range todos.([]any) {
 					todo := item.(map[string]any)
 					content := todo["content"]
-          if content == nil {
-            continue
-          }
+					if content == nil {
+						continue
+					}
 					switch todo["status"] {
 					case "completed":
 						body += fmt.Sprintf("- [x] %s\n", content)
