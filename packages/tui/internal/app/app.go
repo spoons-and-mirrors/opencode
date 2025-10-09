@@ -958,6 +958,92 @@ func (a *App) ListProviders(ctx context.Context) ([]opencode.Provider, error) {
 	return providers.Providers, nil
 }
 
+// ForkSession forks the current session at the current boundary (respects undo state)
+func (a *App) ForkSession(ctx context.Context) (*opencode.Session, error) {
+	// If no revert state, fork the entire session
+	if a.Session.Revert.MessageID == "" {
+		return a.cloneSession(ctx, a.Session.ID, "Fork of "+a.Session.Title)
+	}
+
+	// Find the index of the revert message (first message to exclude)
+	revertIndex := -1
+	for i, message := range a.Messages {
+		if message.Info != nil {
+			switch casted := message.Info.(type) {
+			case opencode.UserMessage:
+				if casted.ID == a.Session.Revert.MessageID {
+					revertIndex = i
+					break
+				}
+			case opencode.AssistantMessage:
+				if casted.ID == a.Session.Revert.MessageID {
+					revertIndex = i
+					break
+				}
+			}
+		}
+		if revertIndex != -1 {
+			break
+		}
+	}
+
+	// If revert message not found, fork entire session as fallback
+	if revertIndex == -1 {
+		return a.cloneSession(ctx, a.Session.ID, "Fork of "+a.Session.Title)
+	}
+
+	// Fork up to (but not including) the revert message
+	upToIndex := revertIndex - 1
+	if upToIndex < 0 {
+		// Edge case: revert to beginning, create empty session by cloning with no messages
+		// We'll use upToIndex = -1 to signal no messages should be copied
+		return a.cloneSessionUpTo(ctx, a.Session.ID, "Fork of "+a.Session.Title, -1)
+	}
+
+	return a.cloneSessionUpTo(ctx, a.Session.ID, "Fork of "+a.Session.Title, upToIndex)
+}
+
+// ForkSessionFromMessage creates a copy of the session up to and including the specified message index
+func (a *App) ForkSessionFromMessage(ctx context.Context, messageIndex int) (*opencode.Session, error) {
+	// Fork only up to the specified message index
+	return a.cloneSessionUpTo(ctx, a.Session.ID, "Fork of "+a.Session.Title, messageIndex)
+}
+
+// cloneSession calls the /session/clone API using the authenticated client
+func (a *App) cloneSession(ctx context.Context, sourceSessionID, title string) (*opencode.Session, error) {
+	// Create request body
+	requestBody := map[string]interface{}{
+		"sourceSessionID": sourceSessionID,
+		"title":           title,
+	}
+
+	var result *opencode.Session
+	err := a.Client.Post(ctx, "/session/clone", requestBody, &result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to clone session: %w", err)
+	}
+
+	return result, nil
+}
+
+// cloneSessionUpTo calls the /session/clone API with upToMessageIndex parameter
+func (a *App) cloneSessionUpTo(ctx context.Context, sourceSessionID, title string, upToMessageIndex int) (*opencode.Session, error) {
+	// Create request body
+	requestBody := map[string]interface{}{
+		"sourceSessionID":  sourceSessionID,
+		"title":            title,
+		"upToMessageIndex": upToMessageIndex,
+	}
+
+	var result *opencode.Session
+	err := a.Client.Post(ctx, "/session/clone", requestBody, &result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to clone session: %w", err)
+	}
+
+	return result, nil
+}
+
 // func (a *App) loadCustomKeybinds() {
 //
 // }

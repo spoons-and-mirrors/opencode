@@ -34,6 +34,12 @@ type RestoreToMessageMsg struct {
 	Index     int
 }
 
+// ForkFromMessageMsg is sent when a new session should be forked from a specific message
+type ForkFromMessageMsg struct {
+	MessageID string
+	Index     int
+}
+
 // timelineItem represents a user message in the timeline list
 type timelineItem struct {
 	messageID string
@@ -194,6 +200,16 @@ func (n *timelineDialog) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					util.CmdHandler(modal.CloseModalMsg{}),
 				)
 			}
+		case "f":
+			// Fork session from selected message
+			if item, idx := n.list.GetSelectedItem(); idx >= 0 {
+				// Find the last message in the assistant's response to this user message
+				endIndex := n.findResponseEndIndex(item.index)
+				return n, tea.Sequence(
+					util.CmdHandler(ForkFromMessageMsg{MessageID: item.messageID, Index: endIndex}),
+					util.CmdHandler(modal.CloseModalMsg{}),
+				)
+			}
 		case "enter":
 			// Keep Enter functionality for closing the modal
 			if _, idx := n.list.GetSelectedItem(); idx >= 0 {
@@ -226,7 +242,11 @@ func (n *timelineDialog) Render(background string) string {
 	) + keyStyle(
 		"r",
 	) + mutedStyle(
-		" restore",
+		" restore   ",
+	) + keyStyle(
+		"f",
+	) + mutedStyle(
+		" fork",
 	)
 
 	bgColor := t.BackgroundPanel()
@@ -279,6 +299,25 @@ func countToolsInResponse(messages []app.Message, userMessageIndex int) int {
 		}
 	}
 	return count
+}
+
+// findResponseEndIndex finds the last message index of the assistant's response to a user message
+func (n *timelineDialog) findResponseEndIndex(userMessageIndex int) int {
+	messages := n.app.Messages
+	endIndex := userMessageIndex // Default to the user message index
+
+	// Look ahead to find the end of the assistant's response
+	for i := userMessageIndex + 1; i < len(messages); i++ {
+		message := messages[i]
+		// If we hit another user message, stop (don't include it)
+		if _, isUser := message.Info.(opencode.UserMessage); isUser {
+			break
+		}
+		// This is part of the assistant's response, include it
+		endIndex = i
+	}
+
+	return endIndex
 }
 
 // NewTimelineDialog creates a new session timeline dialog

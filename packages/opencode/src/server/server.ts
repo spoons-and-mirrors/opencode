@@ -398,6 +398,30 @@ export namespace Server {
           return c.json(todos)
         },
       )
+      .get(
+        "/session/:id/forks",
+        describeRoute({
+          description: "Get forked sessions",
+          operationId: "session.forks",
+          responses: {
+            200: {
+              description: "List of forked sessions",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info.array()),
+                },
+              },
+            },
+            ...ERRORS,
+          },
+        }),
+        validator("param", z.object({ id: z.string() })),
+        async (c) => {
+          const sessionID = c.req.valid("param").id
+          const session = await Session.forks(sessionID)
+          return c.json(session)
+        },
+      )
       .post(
         "/session",
         describeRoute({
@@ -985,6 +1009,40 @@ export namespace Server {
             response: c.req.valid("json").response,
           })
           return c.json(true)
+        },
+      )
+      .post(
+        "/session/clone",
+        describeRoute({
+          description: "Clone a session with all its messages",
+          operationId: "session.clone",
+          responses: {
+            200: {
+              description: "Successfully cloned session",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info),
+                },
+              },
+            },
+            ...ERRORS,
+          },
+        }),
+        validator(
+          "json",
+          z.object({
+            sourceSessionID: z.string().meta({ description: "Source session ID to clone" }),
+            title: z.string().optional().meta({ description: "Title for the cloned session" }),
+            upToMessageIndex: z
+              .number()
+              .optional()
+              .meta({ description: "Only copy messages up to this index (inclusive)" }),
+          }),
+        ),
+        async (c) => {
+          const { sourceSessionID, title, upToMessageIndex } = c.req.valid("json")
+          const clonedSession = await Session.cloneSession(sourceSessionID, title, upToMessageIndex)
+          return c.json(clonedSession)
         },
       )
       .get(

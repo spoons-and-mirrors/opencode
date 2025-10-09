@@ -1280,31 +1280,33 @@ func (r ReasoningPartType) IsKnown() bool {
 }
 
 type Session struct {
-	ID        string        `json:"id,required"`
-	Directory string        `json:"directory,required"`
-	ProjectID string        `json:"projectID,required"`
-	Time      SessionTime   `json:"time,required"`
-	Title     string        `json:"title,required"`
-	Version   string        `json:"version,required"`
-	ParentID  string        `json:"parentID"`
-	Revert    SessionRevert `json:"revert"`
-	Share     SessionShare  `json:"share"`
-	JSON      sessionJSON   `json:"-"`
+	ID           string        `json:"id,required"`
+	Directory    string        `json:"directory,required"`
+	ProjectID    string        `json:"projectID,required"`
+	Time         SessionTime   `json:"time,required"`
+	Title        string        `json:"title,required"`
+	Version      string        `json:"version,required"`
+	ParentID     string        `json:"parentID"`
+	ForkParentID string        `json:"forkParentID"`
+	Revert       SessionRevert `json:"revert"`
+	Share        SessionShare  `json:"share"`
+	JSON         sessionJSON   `json:"-"`
 }
 
 // sessionJSON contains the JSON metadata for the struct [Session]
 type sessionJSON struct {
-	ID          apijson.Field
-	Directory   apijson.Field
-	ProjectID   apijson.Field
-	Time        apijson.Field
-	Title       apijson.Field
-	Version     apijson.Field
-	ParentID    apijson.Field
-	Revert      apijson.Field
-	Share       apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
+	ID           apijson.Field
+	Directory    apijson.Field
+	ProjectID    apijson.Field
+	Time         apijson.Field
+	Title        apijson.Field
+	Version      apijson.Field
+	ParentID     apijson.Field
+	ForkParentID apijson.Field
+	Revert       apijson.Field
+	Share        apijson.Field
+	raw          string
+	ExtraFields  map[string]apijson.Field
 }
 
 func (r *Session) UnmarshalJSON(data []byte) (err error) {

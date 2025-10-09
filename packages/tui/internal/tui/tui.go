@@ -729,6 +729,27 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return app.MessageRevertedMsg{Session: *response, Message: app.Message{}}
 		}
 		cmds = append(cmds, cmd)
+	case dialog.ForkFromMessageMsg:
+		cmd := func() tea.Msg {
+			// Fork session from selected message using the app layer
+			forkedSession, err := a.app.ForkSessionFromMessage(context.Background(), msg.Index)
+			if err != nil {
+				return toast.NewErrorToast("Failed to fork session: " + err.Error())
+			}
+
+			// Switch to the forked session
+			a.app.Session = forkedSession
+
+			// Load messages for the forked session
+			messages, err := a.app.ListMessages(context.Background(), forkedSession.ID)
+			if err != nil {
+				return toast.NewErrorToast("Failed to load forked session messages: " + err.Error())
+			}
+			a.app.Messages = messages
+
+			return app.SessionLoadedMsg{}
+		}
+		cmds = append(cmds, cmd)
 	case app.MessageRevertedMsg:
 		if msg.Session.ID == a.app.Session.ID {
 			a.app.Session = &msg.Session
@@ -1215,6 +1236,30 @@ func (a Model) executeCommand(command commands.Command) (tea.Model, tea.Cmd) {
 		}
 		navigationDialog := dialog.NewTimelineDialog(a.app)
 		a.modal = navigationDialog
+	case commands.SessionForkCommand:
+		if a.app.Session.ID == "" {
+			return a, toast.NewErrorToast("No active session")
+		}
+		cmd := func() tea.Msg {
+			// Fork the current session using the app layer
+			forkedSession, err := a.app.ForkSession(context.Background())
+			if err != nil {
+				return toast.NewErrorToast("Failed to fork session: " + err.Error())
+			}
+
+			// Switch to the forked session
+			a.app.Session = forkedSession
+
+			// Load messages for the forked session
+			messages, err := a.app.ListMessages(context.Background(), forkedSession.ID)
+			if err != nil {
+				return toast.NewErrorToast("Failed to load forked session messages: " + err.Error())
+			}
+			a.app.Messages = messages
+
+			return app.SessionLoadedMsg{}
+		}
+		return a, cmd
 	case commands.SessionShareCommand:
 		if a.app.Session.ID == "" {
 			return a, nil
