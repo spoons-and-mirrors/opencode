@@ -127,6 +127,7 @@ const (
 	SessionNewCommand               CommandName = "session_new"
 	SessionListCommand              CommandName = "session_list"
 	SessionTimelineCommand          CommandName = "session_timeline"
+	SessionForkCommand              CommandName = "session_fork"
 	SessionShareCommand             CommandName = "session_share"
 	SessionUnshareCommand           CommandName = "session_unshare"
 	SessionInterruptCommand         CommandName = "session_interrupt"
@@ -227,6 +228,12 @@ func LoadFromConfig(config *opencode.Config, customCommands []opencode.Command) 
 			Description: "show session timeline",
 			Keybindings: parseBindings("<leader>g"),
 			Trigger:     []string{"timeline", "history", "goto"},
+		},
+		{
+			Name:        SessionForkCommand,
+			Description: "fork current session",
+			Keybindings: parseBindings("<leader>f"),
+			Trigger:     []string{"fork"},
 		},
 		{
 			Name:        SessionShareCommand,

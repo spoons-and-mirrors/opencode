@@ -35,6 +35,7 @@ export namespace Session {
       projectID: z.string(),
       directory: z.string(),
       parentID: Identifier.schema("session").optional(),
+      forkParentID: Identifier.schema("session").optional(),
       share: z
         .object({
           url: z.string(),
@@ -146,13 +147,20 @@ export namespace Session {
     })
   })
 
-  export async function createNext(input: { id?: string; title?: string; parentID?: string; directory: string }) {
+  export async function createNext(input: {
+    id?: string
+    title?: string
+    parentID?: string
+    forkParentID?: string
+    directory: string
+  }) {
     const result: Info = {
       id: Identifier.descending("session", input.id),
       version: Installation.VERSION,
       projectID: Instance.project.id,
       directory: input.directory,
       parentID: input.parentID,
+      forkParentID: input.forkParentID,
       title: input.title ?? createDefaultTitle(!!input.parentID),
       time: {
         created: Date.now(),
@@ -288,28 +296,46 @@ export namespace Session {
     return result
   })
 
-  export const remove = fn(Identifier.schema("session"), async (sessionID) => {
+  export async function forks(forkParentID: string) {
     const project = Instance.project
-    try {
-      const session = await get(sessionID)
-      for (const child of await children(sessionID)) {
-        await remove(child.id)
-      }
-      await unshare(sessionID).catch(() => {})
-      for (const msg of await Storage.list(["message", sessionID])) {
-        for (const part of await Storage.list(["part", msg.at(-1)!])) {
-          await Storage.remove(part)
-        }
-        await Storage.remove(msg)
-      }
-      await Storage.remove(["session", project.id, sessionID])
-      Bus.publish(Event.Deleted, {
-        info: session,
-      })
-    } catch (e) {
-      log.error(e)
+    const result = [] as Session.Info[]
+    for (const item of await Storage.list(["session", project.id])) {
+      const session = await Storage.read<Info>(item)
+      if (session.forkParentID !== forkParentID) continue
+      result.push(session)
     }
-  })
+    return result
+  }
+
+  export const remove = fn(
+    z.union([Identifier.schema("session"), z.tuple([Identifier.schema("session"), z.boolean()])]),
+    async (input, emitEvent = true) => {
+      const sessionID = Array.isArray(input) ? input[0] : input
+      if (Array.isArray(input)) emitEvent = input[1]
+      const project = Instance.project
+      try {
+        const session = await get(sessionID)
+        for (const child of await children(sessionID)) {
+          await remove([child.id, false])
+        }
+        await unshare(sessionID).catch(() => {})
+        for (const msg of await Storage.list(["message", sessionID])) {
+          for (const part of await Storage.list(["part", msg.at(-1)!])) {
+            await Storage.remove(part)
+          }
+          await Storage.remove(msg)
+        }
+        await Storage.remove(["session", project.id, sessionID])
+        if (emitEvent) {
+          Bus.publish(Event.Deleted, {
+            info: session,
+          })
+        }
+      } catch (e) {
+        log.error(e)
+      }
+    },
+  )
 
   export const updateMessage = fn(MessageV2.Info, async (msg) => {
     await Storage.write(["message", msg.sessionID, msg.id], msg)
@@ -405,4 +431,48 @@ export namespace Session {
       await Project.setInitialized(Instance.project.id)
     },
   )
+
+  export async function cloneSession(sourceSessionID: string, title?: string, upToMessageIndex?: number) {
+    const sourceSession = await get(sourceSessionID)
+    const sourceMessages = await messages(sourceSessionID)
+
+    const clonedSession = await createNext({
+      title: title ?? `Fork of ${sourceSession.title}`,
+      directory: sourceSession.directory,
+      forkParentID: sourceSessionID,
+    })
+
+    const messagesToCopy =
+      upToMessageIndex !== undefined ? sourceMessages.slice(0, upToMessageIndex + 1) : sourceMessages
+
+    for (let i = messagesToCopy.length - 1; i >= 0; i--) {
+      const message = messagesToCopy[i]
+      const newMessageID = Identifier.descending("message")
+      const copiedMessage = {
+        ...message.info,
+        id: newMessageID,
+        sessionID: clonedSession.id,
+      }
+      await Storage.write(["message", clonedSession.id, newMessageID], copiedMessage)
+      Bus.publish(MessageV2.Event.Updated, {
+        info: copiedMessage,
+      })
+
+      for (const part of message.parts) {
+        const newPartID = Identifier.ascending("part")
+        const copiedPart = {
+          ...part,
+          id: newPartID,
+          messageID: newMessageID,
+          sessionID: clonedSession.id,
+        }
+        await Storage.write(["part", newMessageID, newPartID], copiedPart)
+        Bus.publish(MessageV2.Event.PartUpdated, {
+          part: copiedPart,
+        })
+      }
+    }
+
+    return clonedSession
+  }
 }
