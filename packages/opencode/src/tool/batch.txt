@@ -8,5 +8,5 @@ Usage:
 - One tool failure doesn't stop others from executing
 - DO NOT use for tools that depend on each other's output
 - DO NOT use the batch tool recursively
-- Tools you are not allowed to batch: [batch, todoread]
+- Tools you are not allowed to batch: [batch, todoread, edit]
 - Batch tool usage has proven to yield efficiency gains from 3 to 10x

@@ -34,18 +34,26 @@ export const BatchTool = Tool.define("batch", async () => {
       const availableTools = await ToolRegistry.tools("", "")
       const toolMap = new Map(availableTools.map((t: any) => [t.id, t]))
 
-      // Validate all tools exist and have proper schema before starting execution
-      for (const call of toolCalls) {
+      // Filter out disabled tools and validate all tools exist
+      const disabledTools = ["batch", "todoread", "patch", "edit"]
+      const filteredCalls = toolCalls.filter((call) => {
         if (!call.tool || !call.parameters) {
           throw new Error(
             `malformed schema: each tool call must have "tool" and "parameters" fields. Retry with proper payload formatting: [{"tool": "tool_name", "parameters": {...}}]`,
           )
         }
         if (!toolMap.has(call.tool)) {
-          const availableTools = Array.from(toolMap.keys()).filter(
-            (name) => !["invalid", "batch", "todoread", "patch"].includes(name),
-          )
+          const availableTools = Array.from(toolMap.keys()).filter((name) => !disabledTools.includes(name))
           throw new Error(`tool '${call.tool}' is not available. Available tools: ${availableTools.join(", ")}`)
+        }
+        return !disabledTools.includes(call.tool)
+      })
+
+      if (filteredCalls.length === 0 && toolCalls.length > 0) {
+        return {
+          title: "No valid tools to execute",
+          output: "All provided tools are disabled in batch calls. Use them directly instead.",
+          metadata: {},
         }
       }
 
@@ -141,49 +149,19 @@ export const BatchTool = Tool.define("batch", async () => {
         }
       }
 
-      // Group edits by file to execute sequentially per file
-      const fileGroups = new Map<string, typeof toolCalls>()
-      const nonEditCalls: typeof toolCalls = []
-
-      for (const call of toolCalls) {
-        if (call.tool === "edit" && call.parameters["filePath"]) {
-          const filePath = call.parameters["filePath"] as string
-          if (!fileGroups.has(filePath)) {
-            fileGroups.set(filePath, [])
-          }
-          fileGroups.get(filePath)!.push(call)
-        } else {
-          nonEditCalls.push(call)
-        }
-      }
-
-      // Execute all non-edit calls in parallel
-      const promises: Promise<{ success: boolean; error?: any } | { success: boolean; error?: any }[]>[] =
-        nonEditCalls.map((call) => executeCall(call))
-
-      // Execute edits for each file sequentially, but different files in parallel
-      for (const [, calls] of fileGroups) {
-        promises.push(
-          (async () => {
-            const results: { success: boolean; error?: any }[] = []
-            for (const call of calls) {
-              if (ctx.abort.aborted) {
-                break
-              }
-              results.push(await executeCall(call))
-            }
-            return results
-          })(),
-        )
-      }
+      // Execute all filtered tool calls in parallel
+      const promises = filteredCalls.map((call) => executeCall(call))
 
       // Wait for all tools to complete and flatten results
       const results = (await Promise.all(promises)).flat()
       const successfulCalls = results.filter((r) => r.success).length
 
       return {
-        title: `Batch execution (${successfulCalls}/${toolCalls.length} successful)`,
-        output: "Keep using the batch tool for optimal performance in your next response!",
+        title: `Batch execution (${successfulCalls}/${filteredCalls.length} successful)`,
+        output:
+          filteredCalls.length < toolCalls.length
+            ? `Executed ${filteredCalls.length} valid tools (skipped ${toolCalls.length - filteredCalls.length} disabled tools). You were rewarded for using the batch tool. ALWAYS Keep using the batch tool!!`
+            : "You were rewarded for using the batch tool. ALWAYS Keep using the batch tool!!",
         metadata: {},
       }
     },
