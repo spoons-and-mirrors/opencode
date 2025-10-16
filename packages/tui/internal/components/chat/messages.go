@@ -41,6 +41,7 @@ type MessagesComponent interface {
 	UndoLastMessage() (tea.Model, tea.Cmd)
 	RedoLastMessage() (tea.Model, tea.Cmd)
 	ScrollToMessage(messageID string) (tea.Model, tea.Cmd)
+	ScrollToPart(partID string) (tea.Model, tea.Cmd)
 }
 
 type messagesComponent struct {
@@ -60,6 +61,7 @@ type messagesComponent struct {
 	lineCount          int
 	selection          *selection
 	messagePositions   map[string]int // map message ID to line position
+	partPositions      map[string]int // map part ID to line position
 	animating          bool
 }
 
@@ -269,6 +271,7 @@ func (m *messagesComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clipboard = msg.clipboard
 		m.loading = false
 		m.messagePositions = msg.messagePositions
+		m.partPositions = msg.partPositions
 		m.tail = m.viewport.AtBottom()
 
 		// Preserve scroll across reflow
@@ -309,6 +312,7 @@ type renderCompleteMsg struct {
 	partCount        int
 	lineCount        int
 	messagePositions map[string]int
+	partPositions    map[string]int
 }
 
 func (m *messagesComponent) renderView() tea.Cmd {
@@ -335,6 +339,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 		partCount := 0
 		lineCount := 0
 		messagePositions := make(map[string]int) // Track message ID to line position
+		partPositions := make(map[string]int)    // Track part ID to line position
 
 		orphanedToolCalls := make([]opencode.ToolPart, 0)
 
@@ -470,6 +475,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 							m.cache.Set(key, content)
 						}
 						if content != "" {
+							partPositions[part.ID] = lineCount // Track part position
 							partCount++
 							lineCount += lipgloss.Height(content) + 1
 							blocks = append(blocks, content)
@@ -565,6 +571,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 							)
 						}
 						if content != "" {
+							partPositions[part.ID] = lineCount // Track part position
 							partCount++
 							lineCount += lipgloss.Height(content) + 1
 							blocks = append(blocks, content)
@@ -615,6 +622,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 							)
 						}
 						if content != "" {
+							partPositions[part.ID] = lineCount // Track part position
 							partCount++
 							lineCount += lipgloss.Height(content) + 1
 							blocks = append(blocks, content)
@@ -644,6 +652,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 								[]opencode.FilePart{},
 								[]opencode.AgentPart{},
 							)
+							partPositions[part.ID] = lineCount // Track part position
 							partCount++
 							lineCount += lipgloss.Height(content) + 1
 							blocks = append(blocks, content)
@@ -856,6 +865,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 			partCount:        partCount,
 			lineCount:        lineCount,
 			messagePositions: messagePositions,
+			partPositions:    partPositions,
 		}
 	}
 }
@@ -1281,6 +1291,18 @@ func (m *messagesComponent) ScrollToMessage(messageID string) (tea.Model, tea.Cm
 	}
 
 	if position, exists := m.messagePositions[messageID]; exists {
+		m.viewport.SetYOffset(position)
+		m.tail = false // Stop auto-scrolling to bottom when manually navigating
+	}
+	return m, nil
+}
+
+func (m *messagesComponent) ScrollToPart(partID string) (tea.Model, tea.Cmd) {
+	if m.partPositions == nil {
+		return m, nil
+	}
+
+	if position, exists := m.partPositions[partID]; exists {
 		m.viewport.SetYOffset(position)
 		m.tail = false // Stop auto-scrolling to bottom when manually navigating
 	}

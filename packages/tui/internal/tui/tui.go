@@ -700,27 +700,42 @@ func (a Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		updated, cmd := a.messages.ScrollToMessage(msg.MessageID)
 		a.messages = updated.(chat.MessagesComponent)
 		cmds = append(cmds, cmd)
+	case dialog.ScrollToPartMsg:
+		updated, cmd := a.messages.ScrollToPart(msg.PartID)
+		a.messages = updated.(chat.MessagesComponent)
+		cmds = append(cmds, cmd)
 	case dialog.RestoreToMessageMsg:
 		cmd := func() tea.Msg {
-			// Find next user message after target
-			var nextMessageID string
-			for i := msg.Index + 1; i < len(a.app.Messages); i++ {
-				if userMsg, ok := a.app.Messages[i].Info.(opencode.UserMessage); ok {
-					nextMessageID = userMsg.ID
-					break
-				}
-			}
-
 			var response *opencode.Session
 			var err error
 
-			if nextMessageID == "" {
-				// Last message - use unrevert to restore full conversation
-				response, err = a.app.Client.Session.Unrevert(context.Background(), a.app.Session.ID, opencode.SessionUnrevertParams{})
+			// If PartID is provided, we're doing a part-level restore
+			if msg.PartID != "" {
+				// For part restore, pass the messageID containing the part and the partID
+				params := opencode.SessionRevertParams{
+					MessageID: opencode.F(msg.MessageID),
+					PartID:    opencode.F(msg.PartID),
+				}
+				response, err = a.app.Client.Session.Revert(context.Background(), a.app.Session.ID, params)
 			} else {
-				// Revert to next message to make target the last visible
-				response, err = a.app.Client.Session.Revert(context.Background(), a.app.Session.ID,
-					opencode.SessionRevertParams{MessageID: opencode.F(nextMessageID)})
+				// Message-level restore (normal mode)
+				// Find next user message after target
+				var nextMessageID string
+				for i := msg.Index + 1; i < len(a.app.Messages); i++ {
+					if userMsg, ok := a.app.Messages[i].Info.(opencode.UserMessage); ok {
+						nextMessageID = userMsg.ID
+						break
+					}
+				}
+
+				if nextMessageID == "" {
+					// Last message - use unrevert to restore full conversation
+					response, err = a.app.Client.Session.Unrevert(context.Background(), a.app.Session.ID, opencode.SessionUnrevertParams{})
+				} else {
+					// Revert to next message to make target the last visible
+					params := opencode.SessionRevertParams{MessageID: opencode.F(nextMessageID)}
+					response, err = a.app.Client.Session.Revert(context.Background(), a.app.Session.ID, params)
+				}
 			}
 
 			if err != nil || response == nil {
