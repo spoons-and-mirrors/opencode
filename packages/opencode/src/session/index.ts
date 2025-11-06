@@ -413,18 +413,18 @@ export namespace Session {
       let cacheWrite = 0
 
       const record = input.metadata as Record<string, unknown> | undefined
-      let provider: "anthropic" | "bedrock" | "other" = "other"
-      if (record?.["anthropic"]) provider = "anthropic"
-      if (provider === "other" && record?.["bedrock"]) provider = "bedrock"
+      let provider: "@ai-sdk/anthropic" | "@ai-sdk/amazon-bedrock" | "other" = "other"
+      if (record?.["@ai-sdk/anthropic"]) provider = "@ai-sdk/anthropic"
+      if (provider === "other" && record?.["@ai-sdk/amazon-bedrock"]) provider = "@ai-sdk/amazon-bedrock"
 
       switch (provider) {
-        case "anthropic": {
-          const anthropic = record?.["anthropic"] as { cacheCreationInputTokens?: number } | undefined
+        case "@ai-sdk/anthropic": {
+          const anthropic = record?.["@ai-sdk/anthropic"] as { cacheCreationInputTokens?: number } | undefined
           cacheWrite = typeof anthropic?.cacheCreationInputTokens === "number" ? anthropic.cacheCreationInputTokens : 0
           break
         }
-        case "bedrock": {
-          const bedrock = record?.["bedrock"] as { usage?: { cacheWriteInputTokens?: number } } | undefined
+        case "@ai-sdk/amazon-bedrock": {
+          const bedrock = record?.["@ai-sdk/amazon-bedrock"] as { usage?: { cacheWriteInputTokens?: number } } | undefined
           const bedrockCacheWrite = bedrock?.usage?.cacheWriteInputTokens
           cacheWrite = typeof bedrockCacheWrite === "number" ? bedrockCacheWrite : 0
           break
