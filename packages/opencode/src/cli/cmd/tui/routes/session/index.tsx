@@ -223,9 +223,19 @@ export function Session() {
       onSelect: (dialog) => {
         dialog.replace(() => (
           <DialogTimeline
-            onMove={(messageID) => {
+            onMove={(messageID, partID, partType) => {
+              // Try to find the specific part if partID is provided (atomic mode)
+              let targetID = messageID
+              if (partID && partType) {
+                // Construct the DOM ID based on part type
+                if (partType === "tool") {
+                  targetID = "tool-" + partID
+                } else if (partType === "text" || partType === "reasoning") {
+                  targetID = "text-" + partID
+                }
+              }
               const child = scroll.getChildren().find((child) => {
-                return child.id === messageID
+                return child.id === targetID
               })
               if (child) scroll.scrollBy(child.y - scroll.y - 1)
             }}
@@ -1128,6 +1138,7 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
 
     return (
       <box
+        id={"tool-" + props.part.id}
         marginTop={margin()}
         {...style}
         renderBefore={function () {
