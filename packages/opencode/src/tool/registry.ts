@@ -82,9 +82,12 @@ export namespace ToolRegistry {
 
   async function all(): Promise<Tool.Info[]> {
     const custom = await state().then((x) => x.custom)
-    return [
+    const config = await Config.get()
+    const batchEnabled = config.experimental?.batch_tool === true
+
+    const tools = [
       InvalidTool,
-      BatchTool,
+      ...(batchEnabled ? [BatchTool] : []),
       BashTool,
       ReadTool,
       GlobTool,
@@ -100,6 +103,8 @@ export namespace ToolRegistry {
       ...(Flag.OPENCODE_EXPERIMENTAL_EXA ? [WebSearchTool, CodeSearchTool] : []),
       ...custom,
     ]
+
+    return tools
   }
 
   export async function ids() {
