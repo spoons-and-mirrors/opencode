@@ -2,7 +2,7 @@ import z from "zod"
 import { Tool } from "./tool"
 import DESCRIPTION from "./batch.txt"
 
-const DISALLOWED = new Set(["batch", "edit", "todoread"]) // keep in sync with docs
+const DISALLOWED = new Set(["batch", "edit", "todoread"])
 const FILTERED_FROM_SUGGESTIONS = new Set(["invalid", "patch", ...DISALLOWED])
 
 export const BatchTool = Tool.define("batch", async () => {
@@ -13,7 +13,6 @@ export const BatchTool = Tool.define("batch", async () => {
         .array(
           z.object({
             tool: z.string().describe("The name of the tool to execute"),
-            // accept arbitrary objects; tools will fully validate
             parameters: z.object({}).passthrough().describe("Parameters for the tool"),
           }),
         )
@@ -37,12 +36,10 @@ export const BatchTool = Tool.define("batch", async () => {
 
       const toolCalls = params.tool_calls
 
-      // Get all available tools
       const { ToolRegistry } = await import("./registry")
       const availableTools = await ToolRegistry.tools("", "")
       const toolMap = new Map(availableTools.map((t) => [t.id, t]))
 
-      // Validate all tools exist and are allowed before starting execution
       for (const call of toolCalls) {
         if (DISALLOWED.has(call.tool)) {
           throw new Error(
@@ -55,7 +52,6 @@ export const BatchTool = Tool.define("batch", async () => {
         }
       }
 
-      // Helper function to execute a single tool call
       const executeCall = async (call: (typeof toolCalls)[0]) => {
         if (ctx.abort.aborted) {
           return { success: false as const, tool: call.tool, error: new Error("Aborted") }
@@ -64,7 +60,6 @@ export const BatchTool = Tool.define("batch", async () => {
         const callStartTime = Date.now()
         const partID = Identifier.ascending("part")
 
-        // Create pending tool part
         await Session.updatePart({
           id: partID,
           messageID: ctx.messageID,
@@ -87,7 +82,6 @@ export const BatchTool = Tool.define("batch", async () => {
           }
           const validatedParams = tool.parameters.parse(call.parameters)
 
-          // Update to running state
           await Session.updatePart({
             id: partID,
             messageID: ctx.messageID,
@@ -104,10 +98,8 @@ export const BatchTool = Tool.define("batch", async () => {
             },
           })
 
-          // Execute the tool
           const result = await tool.execute(validatedParams, { ...ctx, callID: partID })
 
-          // Update to completed state
           await Session.updatePart({
             id: partID,
             messageID: ctx.messageID,
@@ -131,7 +123,6 @@ export const BatchTool = Tool.define("batch", async () => {
 
           return { success: true as const, tool: call.tool }
         } catch (error) {
-          // Update to error state
           await Session.updatePart({
             id: partID,
             messageID: ctx.messageID,
@@ -154,7 +145,6 @@ export const BatchTool = Tool.define("batch", async () => {
         }
       }
 
-      // Execute all calls in parallel (disallowed tools are rejected above)
       const results = await Promise.all(toolCalls.map((call) => executeCall(call)))
       const successfulCalls = results.filter((r) => r.success).length
       const failedCalls = toolCalls.length - successfulCalls
