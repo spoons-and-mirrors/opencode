@@ -83,11 +83,10 @@ export namespace ToolRegistry {
   async function all(): Promise<Tool.Info[]> {
     const custom = await state().then((x) => x.custom)
     const config = await Config.get()
-    const batchEnabled = config.experimental?.batch_tool === true
 
     const tools = [
       InvalidTool,
-      ...(batchEnabled ? [BatchTool] : []),
+      ...(Flag.OPENCODE_EXPERIMENTAL_BATCH || config.experimental?.batch_tool === true ? [BatchTool] : []),
       BashTool,
       ReadTool,
       GlobTool,
