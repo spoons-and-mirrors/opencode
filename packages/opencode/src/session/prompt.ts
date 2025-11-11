@@ -556,6 +556,9 @@ export namespace SessionPrompt {
     )
     system.push(...(await SystemPrompt.environment()))
     system.push(...(await SystemPrompt.custom()))
+    if (input.agent.instructions) {
+      system.push(...(await SystemPrompt.agentInstructions(input.agent.instructions)))
+    }
     // max 2 system prompt messages for caching purposes
     const [first, ...rest] = system
     system = [first, rest.join("\n")]

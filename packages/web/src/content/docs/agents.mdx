@@ -299,6 +299,50 @@ Use the `model` config to override the default model for this agent. Useful for 
 
 ---
 
+### Instructions
+
+Specify additional instruction files that are loaded only for this specific agent with the `instructions` config. This allows you to provide agent-specific context, guidelines, or rules that supplement the agent's prompt.
+
+```json title="opencode.json"
+{
+  "agent": {
+    "review": {
+      "description": "Reviews code for best practices",
+      "mode": "subagent",
+      "instructions": ["./code-standards.md", "~/team-guidelines.md", "./.app/docs/*.md"]
+    }
+  }
+}
+```
+
+Instructions are loaded after the agent's prompt and before any tool execution. The paths can be:
+
+- **Relative paths**: Searched from the current working directory up to the git worktree root (e.g., `"./guidelines.md"`)
+- **Absolute paths**: Direct file paths (e.g., `"/path/to/file.md"`)
+- **Home-relative paths**: Using `~` to reference your home directory (e.g., `"~/standards.md"`)
+- **Glob patterns**: Match multiple files (e.g., `"./.app/docs/*.md"`, `"docs/**/*.md"`)
+
+You can also specify instructions in Markdown agent files:
+
+```markdown title="~/.config/opencode/agent/review.md"
+---
+description: Reviews code for quality and best practices
+mode: subagent
+instructions:
+  - ./review-checklist.md
+  - ~/coding-standards.md
+  - ./.app/docs/*.md
+---
+
+You are in code review mode. Follow the guidelines in the instruction files.
+```
+
+:::note
+Agent-specific instructions are loaded **in addition to** global instructions configured via the `instructions` field in your main config. Global instructions apply to all agents, while agent instructions only apply to that specific agent.
+:::
+
+---
+
 ### Tools
 
 Control which tools are available in this agent with the `tools` config. You can enable or disable specific tools by setting them to `true` or `false`.
