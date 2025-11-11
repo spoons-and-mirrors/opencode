@@ -21,6 +21,16 @@ export const BatchTool = Tool.define("batch", async () => {
         .max(10, "Too many tools in batch. Maximum allowed is 10.")
         .describe("Array of tool calls to execute in parallel"),
     }),
+    formatValidationError(error) {
+      const formattedErrors = error.issues
+        .map((issue) => {
+          const path = issue.path.length > 0 ? issue.path.join(".") : "root"
+          return `  - ${path}: ${issue.message}`
+        })
+        .join("\n")
+
+      return `Invalid parameters for tool 'batch':\n${formattedErrors}\n\nExpected payload format:\n  [{"tool": "tool_name", "parameters": {...}}, {...}]`
+    },
     async execute(params, ctx) {
       const { Session } = await import("../session")
       const { Identifier } = await import("../id/id")
