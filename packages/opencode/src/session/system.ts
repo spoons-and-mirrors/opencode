@@ -116,6 +116,37 @@ export namespace SystemPrompt {
     return Promise.all(found).then((result) => result.filter(Boolean))
   }
 
+  export async function agentInstructions(instructions: string[]) {
+    const paths = new Set<string>()
+
+    for (let instruction of instructions) {
+      if (instruction.startsWith("~/")) {
+        instruction = path.join(os.homedir(), instruction.slice(2))
+      }
+      let matches: string[] = []
+      if (path.isAbsolute(instruction)) {
+        matches = await Array.fromAsync(
+          new Bun.Glob(path.basename(instruction)).scan({
+            cwd: path.dirname(instruction),
+            absolute: true,
+            onlyFiles: true,
+          }),
+        ).catch(() => [])
+      } else {
+        matches = await Filesystem.globUp(instruction, Instance.directory, Instance.worktree).catch(() => [])
+      }
+      matches.forEach((path) => paths.add(path))
+    }
+
+    const found = Array.from(paths).map((p) =>
+      Bun.file(p)
+        .text()
+        .catch(() => "")
+        .then((x) => "Instructions from: " + p + "\n" + x),
+    )
+    return Promise.all(found).then((result) => result.filter(Boolean))
+  }
+
   export function summarize(providerID: string) {
     switch (providerID) {
       case "anthropic":

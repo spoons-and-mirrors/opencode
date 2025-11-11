@@ -31,6 +31,7 @@ export namespace Agent {
         })
         .optional(),
       prompt: z.string().optional(),
+      instructions: z.array(z.string()).optional(),
       tools: z.record(z.string(), z.boolean()),
       options: z.record(z.string(), z.any()),
     })
@@ -148,13 +149,15 @@ export namespace Agent {
           tools: {},
           builtIn: false,
         }
-      const { name, model, prompt, tools, description, temperature, top_p, mode, permission, color, ...extra } = value
+      const { name, model, prompt, tools, description, temperature, top_p, mode, permission, color, instructions, ...extra } =
+        value
       item.options = {
         ...item.options,
         ...extra,
       }
       if (model) item.model = Provider.parseModel(model)
       if (prompt) item.prompt = prompt
+      if (instructions) item.instructions = instructions
       if (tools)
         item.tools = {
           ...item.tools,

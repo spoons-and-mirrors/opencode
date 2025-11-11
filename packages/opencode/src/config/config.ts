@@ -364,6 +364,10 @@ export namespace Config {
         .regex(/^#[0-9a-fA-F]{6}$/, "Invalid hex color format")
         .optional()
         .describe("Hex color code for the agent (e.g., #FF5733)"),
+      instructions: z
+        .array(z.string())
+        .optional()
+        .describe("Additional instruction files or patterns to include for this agent"),
       permission: z
         .object({
           edit: Permission.optional(),
