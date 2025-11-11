@@ -29,6 +29,7 @@ export namespace Tool {
         output: string
         attachments?: MessageV2.FilePart[]
       }>
+      formatValidationError?(error: z.ZodError): string
     }>
   }
 
@@ -48,24 +49,8 @@ export namespace Tool {
           try {
             toolInfo.parameters.parse(args)
           } catch (error) {
-            if (error instanceof z.ZodError) {
-              const formattedErrors = error.issues
-                .map((issue) => {
-                  const path = issue.path.length > 0 ? issue.path.join(".") : "root"
-                  return `  - ${path}: ${issue.message}`
-                })
-                .join("\n")
-
-              let errorMessage = `Invalid parameters for tool '${id}':\n${formattedErrors}`
-
-              // Special handling for batch tool
-              if (id === "batch") {
-                errorMessage += '\n\nExpected payload format:\n  [{"tool": "tool_name", "parameters": {...}}, {...}]'
-              } else {
-                errorMessage += "\n\nRefer to the tool description for proper usage and required parameters."
-              }
-
-              throw new Error(errorMessage)
+            if (error instanceof z.ZodError && toolInfo.formatValidationError) {
+              throw new Error(toolInfo.formatValidationError(error))
             }
             throw error
           }
