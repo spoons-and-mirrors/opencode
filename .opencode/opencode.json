@@ -1,10 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    "opencode-openai-codex-auth",
-    "opencode-copilot-auth@0.0.5",
-    "opencode-anthropic-auth@0.0.2",
-  ],
+  "plugin": ["opencode-openai-codex-auth", "opencode-copilot-auth@0.0.5", "opencode-anthropic-auth@0.0.2"],
   "mcp": {
     "weather": {
       "type": "local",
