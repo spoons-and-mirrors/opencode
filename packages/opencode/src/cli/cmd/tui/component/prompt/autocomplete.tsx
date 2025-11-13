@@ -220,6 +220,11 @@ export function Autocomplete(props: {
           onSelect: () => command.trigger("session.compact"),
         },
         {
+          display: "/prune",
+          description: "prune all tool call outputs",
+          onSelect: () => command.trigger("session.prune"),
+        },
+        {
           display: "/unshare",
           disabled: !s.share,
           description: "unshare a session",
