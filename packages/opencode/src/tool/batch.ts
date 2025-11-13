@@ -13,7 +13,7 @@ export const BatchTool = Tool.define("batch", async () => {
         .array(
           z.object({
             tool: z.string().describe("The name of the tool to execute"),
-            parameters: z.object({}).passthrough().describe("Parameters for the tool"),
+            parameters: z.object({}).loose().describe("Parameters for the tool"),
           }),
         )
         .min(1, "Provide at least one tool call")

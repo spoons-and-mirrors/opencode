@@ -86,7 +86,6 @@ export namespace ToolRegistry {
 
     return [
       InvalidTool,
-      ...(Flag.OPENCODE_EXPERIMENTAL_BATCH || config.experimental?.batch_tool === true ? [BatchTool] : []),
       BashTool,
       ReadTool,
       GlobTool,
@@ -98,6 +97,7 @@ export namespace ToolRegistry {
       WebFetchTool,
       TodoWriteTool,
       TodoReadTool,
+      ...(config.experimental?.batch_tool === true ? [BatchTool] : []),
       ...(Flag.OPENCODE_EXPERIMENTAL_EXA ? [WebSearchTool, CodeSearchTool] : []),
       ...custom,
     ]
