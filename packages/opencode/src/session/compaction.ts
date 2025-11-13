@@ -51,6 +51,29 @@ export namespace SessionCompaction {
     if (Flag.OPENCODE_DISABLE_PRUNE) return
     log.info("pruning", { force: input.force })
     const msgs = await Session.messages({ sessionID: input.sessionID })
+
+    if (input.force) {
+      const toPrune = [] as Array<MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted }>
+      let pruned = 0
+      for (const msg of msgs) {
+        for (const part of msg.parts) {
+          if (part.type !== "tool") continue
+          if (part.state.status !== "completed") continue
+          if (part.state.time.compacted) continue
+          const estimate = Token.estimate(part.state.output)
+          pruned += estimate
+          toPrune.push(part as MessageV2.ToolPart & { state: MessageV2.ToolStateCompleted })
+        }
+      }
+      log.info("found", { pruned, total: pruned })
+      for (const part of toPrune) {
+        part.state.time.compacted = Date.now()
+        await Session.updatePart(part)
+      }
+      log.info("pruned", { count: toPrune.length })
+      return
+    }
+
     let total = 0
     let pruned = 0
     const toPrune = []
@@ -58,9 +81,9 @@ export namespace SessionCompaction {
 
     loop: for (let msgIndex = msgs.length - 1; msgIndex >= 0; msgIndex--) {
       const msg = msgs[msgIndex]
+      if (msg.info.role === "assistant" && msg.info.summary) break loop
       if (msg.info.role === "user") turns++
       if (turns < 2) continue
-      if (msg.info.role === "assistant" && msg.info.summary) break loop
       for (let partIndex = msg.parts.length - 1; partIndex >= 0; partIndex--) {
         const part = msg.parts[partIndex]
         if (part.type === "tool")
@@ -68,7 +91,7 @@ export namespace SessionCompaction {
             if (part.state.time.compacted) break loop
             const estimate = Token.estimate(part.state.output)
             total += estimate
-            if (input.force || total > PRUNE_PROTECT) {
+            if (total > PRUNE_PROTECT) {
               pruned += estimate
               toPrune.push(part)
             }
@@ -76,7 +99,7 @@ export namespace SessionCompaction {
       }
     }
     log.info("found", { pruned, total })
-    if (input.force || pruned > PRUNE_MINIMUM) {
+    if (pruned > PRUNE_MINIMUM) {
       for (const part of toPrune) {
         if (part.state.status === "completed") {
           part.state.time.compacted = Date.now()
