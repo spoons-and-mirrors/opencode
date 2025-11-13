@@ -47,9 +47,9 @@ export namespace SessionCompaction {
   // goes backwards through parts until there are 40_000 tokens worth of tool
   // calls. then erases output of previous tool calls. idea is to throw away old
   // tool calls that are no longer relevant.
-  export async function prune(input: { sessionID: string }) {
+  export async function prune(input: { sessionID: string; force?: boolean }) {
     if (Flag.OPENCODE_DISABLE_PRUNE) return
-    log.info("pruning")
+    log.info("pruning", { force: input.force })
     const msgs = await Session.messages({ sessionID: input.sessionID })
     let total = 0
     let pruned = 0
@@ -68,7 +68,7 @@ export namespace SessionCompaction {
             if (part.state.time.compacted) break loop
             const estimate = Token.estimate(part.state.output)
             total += estimate
-            if (total > PRUNE_PROTECT) {
+            if (input.force || total > PRUNE_PROTECT) {
               pruned += estimate
               toPrune.push(part)
             }
@@ -76,7 +76,7 @@ export namespace SessionCompaction {
       }
     }
     log.info("found", { pruned, total })
-    if (pruned > PRUNE_MINIMUM) {
+    if (input.force || pruned > PRUNE_MINIMUM) {
       for (const part of toPrune) {
         if (part.state.status === "completed") {
           part.state.time.compacted = Date.now()

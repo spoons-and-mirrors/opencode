@@ -255,6 +255,23 @@ export function Session() {
         dialog.clear()
       },
     },
+    {
+      title: "Prune session",
+      value: "session.prune",
+      keybind: "session_prune",
+      category: "Session",
+      onSelect: (dialog) => {
+        sdk.client.session
+          .prune({
+            path: {
+              id: route.sessionID,
+            },
+          })
+          .then(() => toast.show({ message: "Session pruned successfully!", variant: "success" }))
+          .catch(() => toast.show({ message: "Failed to prune session", variant: "error" }))
+        dialog.clear()
+      },
+    },
     ...(sync.data.config.share !== "disabled"
       ? [
           {

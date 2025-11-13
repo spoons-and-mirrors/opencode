@@ -724,6 +724,35 @@ export namespace Server {
           return c.json(true)
         },
       )
+      .post(
+        "/session/:id/prune",
+        describeRoute({
+          description: "Prune all tool call outputs from the session",
+          operationId: "session.prune",
+          responses: {
+            200: {
+              description: "Pruned session",
+              content: {
+                "application/json": {
+                  schema: resolver(z.boolean()),
+                },
+              },
+            },
+            ...errors(400, 404),
+          },
+        }),
+        validator(
+          "param",
+          z.object({
+            id: z.string().meta({ description: "Session ID" }),
+          }),
+        ),
+        async (c) => {
+          const id = c.req.valid("param").id
+          await SessionCompaction.prune({ sessionID: id, force: true })
+          return c.json(true)
+        },
+      )
       .get(
         "/session/:id/message",
         describeRoute({
@@ -1607,6 +1636,7 @@ export namespace Server {
               session_share: "session.share",
               session_interrupt: "session.interrupt",
               session_compact: "session.compact",
+              session_prune: "session.prune",
               messages_page_up: "session.page.up",
               messages_page_down: "session.page.down",
               messages_half_page_up: "session.half.page.up",
