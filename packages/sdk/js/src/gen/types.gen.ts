@@ -71,6 +71,10 @@ export type KeybindsConfig = {
    */
   session_compact?: string
   /**
+   * Prune all tool call outputs from the session
+   */
+  session_prune?: string
+  /**
    * Scroll messages up by one page
    */
   messages_page_up?: string
@@ -194,6 +198,10 @@ export type AgentConfig = {
    * Hex color code for the agent (e.g., #FF5733)
    */
   color?: string
+  /**
+   * Additional instruction files or patterns to include for this agent
+   */
+  instructions?: Array<string>
   permission?: {
     edit?: "ask" | "allow" | "deny"
     bash?:
@@ -214,6 +222,7 @@ export type AgentConfig = {
       }
     | boolean
     | ("subagent" | "primary" | "all")
+    | Array<string>
     | {
         edit?: "ask" | "allow" | "deny"
         bash?:
@@ -508,6 +517,10 @@ export type Config = {
      */
     chatMaxRetries?: number
     disable_paste_summary?: boolean
+    /**
+     * Enable the batch tool
+     */
+    batch_tool?: boolean
   }
 }
 
@@ -1071,6 +1084,7 @@ export type Agent = {
     providerID: string
   }
   prompt?: string
+  instructions?: Array<string>
   tools: {
     [key: string]: boolean
   }
@@ -1124,6 +1138,7 @@ export type EventTuiCommandExecute = {
           | "session.share"
           | "session.interrupt"
           | "session.compact"
+          | "session.prune"
           | "session.page.up"
           | "session.page.down"
           | "session.half.page.up"
@@ -1982,6 +1997,42 @@ export type SessionSummarizeResponses = {
 }
 
 export type SessionSummarizeResponse = SessionSummarizeResponses[keyof SessionSummarizeResponses]
+
+export type SessionPruneData = {
+  body?: never
+  path: {
+    /**
+     * Session ID
+     */
+    id: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{id}/prune"
+}
+
+export type SessionPruneErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionPruneError = SessionPruneErrors[keyof SessionPruneErrors]
+
+export type SessionPruneResponses = {
+  /**
+   * Pruned session
+   */
+  200: boolean
+}
+
+export type SessionPruneResponse = SessionPruneResponses[keyof SessionPruneResponses]
 
 export type SessionMessagesData = {
   body?: never

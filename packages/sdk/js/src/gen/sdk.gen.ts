@@ -59,6 +59,9 @@ import type {
   SessionSummarizeData,
   SessionSummarizeResponses,
   SessionSummarizeErrors,
+  SessionPruneData,
+  SessionPruneResponses,
+  SessionPruneErrors,
   SessionMessagesData,
   SessionMessagesResponses,
   SessionMessagesErrors,
@@ -425,6 +428,16 @@ class Session extends _HeyApiClient {
         "Content-Type": "application/json",
         ...options.headers,
       },
+    })
+  }
+
+  /**
+   * Prune all tool call outputs from the session
+   */
+  public prune<ThrowOnError extends boolean = false>(options: Options<SessionPruneData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionPruneResponses, SessionPruneErrors, ThrowOnError>({
+      url: "/session/{id}/prune",
+      ...options,
     })
   }
 
