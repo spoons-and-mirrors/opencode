@@ -167,38 +167,47 @@ export const PatchTool = Tool.define("patch", {
           }
           await fs.writeFile(change.filePath, change.newContent, "utf-8")
           changedFiles.push(change.filePath)
+          // Update file time tracking
+          FileTime.read(ctx.sessionID, change.filePath)
           break
 
         case "update":
-          await fs.writeFile(change.filePath, change.newContent, "utf-8")
-          changedFiles.push(change.filePath)
+          await FileTime.withLock(change.filePath, async () => {
+            await fs.writeFile(change.filePath, change.newContent, "utf-8")
+            changedFiles.push(change.filePath)
+            // Update file time tracking
+            FileTime.read(ctx.sessionID, change.filePath)
+          })
           break
 
         case "move":
           if (change.movePath) {
-            // Create parent directories for destination
-            const moveDir = path.dirname(change.movePath)
-            if (moveDir !== "." && moveDir !== "/") {
-              await fs.mkdir(moveDir, { recursive: true })
-            }
-            // Write to new location
-            await fs.writeFile(change.movePath, change.newContent, "utf-8")
-            // Remove original
-            await fs.unlink(change.filePath)
-            changedFiles.push(change.movePath)
+            await FileTime.withLock(change.filePath, async () => {
+              // Create parent directories for destination
+              const moveDir = path.dirname(change.movePath!)
+              if (moveDir !== "." && moveDir !== "/") {
+                await fs.mkdir(moveDir, { recursive: true })
+              }
+              // Write to new location
+              await fs.writeFile(change.movePath!, change.newContent, "utf-8")
+              // Remove original
+              await fs.unlink(change.filePath)
+              changedFiles.push(change.movePath!)
+              // Update file time tracking
+              FileTime.read(ctx.sessionID, change.filePath)
+              FileTime.read(ctx.sessionID, change.movePath!)
+            })
           }
           break
 
         case "delete":
-          await fs.unlink(change.filePath)
-          changedFiles.push(change.filePath)
+          await FileTime.withLock(change.filePath, async () => {
+            await fs.unlink(change.filePath)
+            changedFiles.push(change.filePath)
+            // Update file time tracking
+            FileTime.read(ctx.sessionID, change.filePath)
+          })
           break
-      }
-
-      // Update file time tracking
-      FileTime.read(ctx.sessionID, change.filePath)
-      if (change.movePath) {
-        FileTime.read(ctx.sessionID, change.movePath)
       }
     }
 

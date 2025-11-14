@@ -39,29 +39,31 @@ export const WriteTool = Tool.define("write", {
       }
     }
 
-    const file = Bun.file(filepath)
-    const exists = await file.exists()
-    if (exists) await FileTime.assert(ctx.sessionID, filepath)
+    await FileTime.withLock(filepath, async () => {
+      const file = Bun.file(filepath)
+      const exists = await file.exists()
+      if (exists) await FileTime.assert(ctx.sessionID, filepath)
 
-    if (agent.permission.edit === "ask")
-      await Permission.ask({
-        type: "write",
-        sessionID: ctx.sessionID,
-        messageID: ctx.messageID,
-        callID: ctx.callID,
-        title: exists ? "Overwrite this file: " + filepath : "Create new file: " + filepath,
-        metadata: {
-          filePath: filepath,
-          content: params.content,
-          exists,
-        },
+      if (agent.permission.edit === "ask")
+        await Permission.ask({
+          type: "write",
+          sessionID: ctx.sessionID,
+          messageID: ctx.messageID,
+          callID: ctx.callID,
+          title: exists ? "Overwrite this file: " + filepath : "Create new file: " + filepath,
+          metadata: {
+            filePath: filepath,
+            content: params.content,
+            exists,
+          },
+        })
+
+      await Bun.write(filepath, params.content)
+      await Bus.publish(File.Event.Edited, {
+        file: filepath,
       })
-
-    await Bun.write(filepath, params.content)
-    await Bus.publish(File.Event.Edited, {
-      file: filepath,
+      FileTime.read(ctx.sessionID, filepath)
     })
-    FileTime.read(ctx.sessionID, filepath)
 
     let output = ""
     await LSP.touchFile(filepath, true)

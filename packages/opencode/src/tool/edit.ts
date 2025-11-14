@@ -83,35 +83,37 @@ export const EditTool = Tool.define("edit", {
         return
       }
 
-      const file = Bun.file(filePath)
-      const stats = await file.stat().catch(() => {})
-      if (!stats) throw new Error(`File ${filePath} not found`)
-      if (stats.isDirectory()) throw new Error(`Path is a directory, not a file: ${filePath}`)
-      await FileTime.assert(ctx.sessionID, filePath)
-      contentOld = await file.text()
-      contentNew = replace(contentOld, params.oldString, params.newString, params.replaceAll)
+      await FileTime.withLock(filePath, async () => {
+        const file = Bun.file(filePath)
+        const stats = await file.stat().catch(() => {})
+        if (!stats) throw new Error(`File ${filePath} not found`)
+        if (stats.isDirectory()) throw new Error(`Path is a directory, not a file: ${filePath}`)
+        await FileTime.assert(ctx.sessionID, filePath)
+        contentOld = await file.text()
+        contentNew = replace(contentOld, params.oldString, params.newString, params.replaceAll)
 
-      diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
-      if (agent.permission.edit === "ask") {
-        await Permission.ask({
-          type: "edit",
-          sessionID: ctx.sessionID,
-          messageID: ctx.messageID,
-          callID: ctx.callID,
-          title: "Edit this file: " + filePath,
-          metadata: {
-            filePath,
-            diff,
-          },
+        diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
+        if (agent.permission.edit === "ask") {
+          await Permission.ask({
+            type: "edit",
+            sessionID: ctx.sessionID,
+            messageID: ctx.messageID,
+            callID: ctx.callID,
+            title: "Edit this file: " + filePath,
+            metadata: {
+              filePath,
+              diff,
+            },
+          })
+        }
+
+        await file.write(contentNew)
+        await Bus.publish(File.Event.Edited, {
+          file: filePath,
         })
-      }
-
-      await file.write(contentNew)
-      await Bus.publish(File.Event.Edited, {
-        file: filePath,
+        contentNew = await file.text()
+        diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
       })
-      contentNew = await file.text()
-      diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
     })()
 
     FileTime.read(ctx.sessionID, filePath)

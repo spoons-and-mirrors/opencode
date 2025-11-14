@@ -9,8 +9,10 @@ export namespace FileTime {
         [path: string]: Date | undefined
       }
     } = {}
+    const locks = new Map<string, Promise<void>>()
     return {
       read,
+      locks,
     }
   })
 
@@ -33,6 +35,32 @@ export namespace FileTime {
       throw new Error(
         `File ${filepath} has been modified since it was last read.\nLast modification: ${stats.mtime.toISOString()}\nLast read: ${time.toISOString()}\n\nPlease read the file again before modifying it.`,
       )
+    }
+  }
+
+  export async function withLock<T>(filepath: string, fn: () => Promise<T>): Promise<T> {
+    const { locks } = state()
+    const key = filepath
+
+    const previous = locks.get(key) || Promise.resolve()
+    let resolveNext: () => void
+
+    const next = new Promise<void>((resolve) => {
+      resolveNext = resolve
+    })
+    locks.set(
+      key,
+      previous.then(() => next),
+    )
+
+    try {
+      await previous
+      const result = await fn()
+      resolveNext!()
+      return result
+    } catch (error) {
+      resolveNext!()
+      throw error
     }
   }
 }
