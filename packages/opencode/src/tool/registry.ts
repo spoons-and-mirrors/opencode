@@ -84,7 +84,7 @@ export namespace ToolRegistry {
     const custom = await state().then((x) => x.custom)
     const config = await Config.get()
 
-   return [
+    return [
       InvalidTool,
       ...(Flag.OPENCODE_EXPERIMENTAL_BATCH || config.experimental?.batch_tool === true ? [BatchTool] : []),
       BashTool,

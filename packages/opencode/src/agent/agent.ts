@@ -149,8 +149,20 @@ export namespace Agent {
           tools: {},
           builtIn: false,
         }
-      const { name, model, prompt, tools, description, temperature, top_p, mode, permission, color, instructions, ...extra } =
-        value
+      const {
+        name,
+        model,
+        prompt,
+        tools,
+        description,
+        temperature,
+        top_p,
+        mode,
+        permission,
+        color,
+        instructions,
+        ...extra
+      } = value
       item.options = {
         ...item.options,
         ...extra,
