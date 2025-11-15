@@ -78,15 +78,23 @@ export const BatchTool = Tool.define("batch", async () => {
       const successfulCalls = results.filter((r) => r.success).length
       const failedCalls = toolCalls.length - successfulCalls
 
+      const outputParts = results.map((r) => {
+        if (r.success) {
+          return `<tool_result name="${r.tool}">\n${r.result.output}\n</tool_result>`
+        }
+        const errorMessage = r.error instanceof Error ? r.error.message : String(r.error)
+        return `<tool_result name="${r.tool}">\nError: ${errorMessage}\n</tool_result>`
+      })
+
       const outputMessage =
         failedCalls > 0
-          ? `Executed ${successfulCalls}/${toolCalls.length} tools successfully. ${failedCalls} failed.`
-          : `All ${successfulCalls} tools executed successfully.\n\nKeep using the batch tool for optimal performance in your next response!`
+          ? `Executed ${successfulCalls}/${toolCalls.length} tools successfully. ${failedCalls} failed.\n\n${outputParts.join("\n\n")}`
+          : `All ${successfulCalls} tools executed successfully.\n\n${outputParts.join("\n\n")}\n\nKeep using the batch tool for optimal performance in your next response!`
 
       return {
         title: `Batch execution (${successfulCalls}/${toolCalls.length} successful)`,
         output: outputMessage,
-        attachments: results.filter((result) => result.success).flatMap((r) => r.result.attachments),
+        attachments: results.filter((result) => result.success).flatMap((r) => r.result.attachments ?? []),
         metadata: {
           totalCalls: toolCalls.length,
           successful: successfulCalls,
