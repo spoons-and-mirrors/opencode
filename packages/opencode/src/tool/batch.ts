@@ -31,7 +31,6 @@ export const BatchTool = Tool.define("batch", async () => {
       return `Invalid parameters for tool 'batch':\n${formattedErrors}\n\nExpected payload format:\n  [{"tool": "tool_name", "parameters": {...}}, {...}]`
     },
     async execute(params, ctx) {
-      const { Session } = await import("../session")
       const { Identifier } = await import("../id/id")
 
       const toolCalls = params.tool_calls
@@ -57,22 +56,7 @@ export const BatchTool = Tool.define("batch", async () => {
           return { success: false as const, tool: call.tool, error: new Error("Aborted") }
         }
 
-        const callStartTime = Date.now()
         const partID = Identifier.ascending("part")
-
-        await Session.updatePart({
-          id: partID,
-          messageID: ctx.messageID,
-          sessionID: ctx.sessionID,
-          type: "tool",
-          tool: call.tool,
-          callID: partID,
-          state: {
-            status: "pending",
-            input: call.parameters,
-            raw: JSON.stringify(call),
-          },
-        })
 
         try {
           const tool = toolMap.get(call.tool)
@@ -82,70 +66,15 @@ export const BatchTool = Tool.define("batch", async () => {
           }
           const validatedParams = tool.parameters.parse(call.parameters)
 
-          await Session.updatePart({
-            id: partID,
-            messageID: ctx.messageID,
-            sessionID: ctx.sessionID,
-            type: "tool",
-            tool: call.tool,
-            callID: partID,
-            state: {
-              status: "running",
-              input: call.parameters,
-              time: {
-                start: callStartTime,
-              },
-            },
-          })
-
           const result = await tool.execute(validatedParams, { ...ctx, callID: partID })
 
-          await Session.updatePart({
-            id: partID,
-            messageID: ctx.messageID,
-            sessionID: ctx.sessionID,
-            type: "tool",
-            tool: call.tool,
-            callID: partID,
-            state: {
-              status: "completed",
-              input: call.parameters,
-              output: result.output,
-              title: result.title,
-              metadata: result.metadata,
-              attachments: result.attachments,
-              time: {
-                start: callStartTime,
-                end: Date.now(),
-              },
-            },
-          })
-
-          return { success: true as const, tool: call.tool }
+          return { success: true as const, tool: call.tool, result }
         } catch (error) {
-          await Session.updatePart({
-            id: partID,
-            messageID: ctx.messageID,
-            sessionID: ctx.sessionID,
-            type: "tool",
-            tool: call.tool,
-            callID: partID,
-            state: {
-              status: "error",
-              input: call.parameters,
-              error: error instanceof Error ? error.message : String(error),
-              time: {
-                start: callStartTime,
-                end: Date.now(),
-              },
-            },
-          })
-
           return { success: false as const, tool: call.tool, error }
         }
       }
 
-      const results = await Promise.all(toolCalls.map((call) => executeCall(call)))
+      const results = await Promise.all(toolCalls.flatMap((call) => executeCall(call)))
       const successfulCalls = results.filter((r) => r.success).length
       const failedCalls = toolCalls.length - successfulCalls
 
@@ -157,6 +86,7 @@ export const BatchTool = Tool.define("batch", async () => {
       return {
         title: `Batch execution (${successfulCalls}/${toolCalls.length} successful)`,
         output: outputMessage,
+        attachments: results.filter((result) => result.success).flatMap((r) => r.result.attachments),
         metadata: {
           totalCalls: toolCalls.length,
           successful: successfulCalls,
