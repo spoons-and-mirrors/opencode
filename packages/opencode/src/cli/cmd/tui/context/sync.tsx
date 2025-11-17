@@ -30,12 +30,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       provider_default: Record<string, string>
       agent: Agent[]
       command: Command[]
-      pluginCommand: Array<{
-        name: string
-        description: string
-        aliases?: string[]
-        sessionOnly?: boolean
-      }>
       permission: {
         [sessionID: string]: Permission[]
       }
@@ -67,7 +61,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       agent: [],
       permission: {},
       command: [],
-      pluginCommand: [],
       provider: [],
       provider_default: {},
       session: [],
@@ -262,7 +255,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               ),
             ),
             sdk.client.command.list().then((x) => setStore("command", x.data ?? [])),
-            sdk.client.pluginCommand.list().then((x) => setStore("pluginCommand", x.data ?? [])),
             sdk.client.lsp.status().then((x) => setStore("lsp", x.data!)),
             sdk.client.mcp.status().then((x) => setStore("mcp", x.data!)),
             sdk.client.formatter.status().then((x) => setStore("formatter", x.data!)),

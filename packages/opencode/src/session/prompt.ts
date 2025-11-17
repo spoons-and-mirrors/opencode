@@ -1293,7 +1293,42 @@ export namespace SessionPrompt {
   export async function command(input: CommandInput) {
     log.info("command", input)
     const command = await Command.get(input.command)
-    const agentName = command.agent ?? input.agent ?? "build"
+    const agentName = command?.agent ?? input.agent ?? "build"
+
+    const plugins = await Plugin.list()
+    for (const plugin of plugins) {
+      const pluginCommands = plugin["plugin.command"]
+      const pluginCommand = pluginCommands?.[input.command]
+      if (!pluginCommand) continue
+
+      const client = await Plugin.client()
+      await pluginCommand.execute({ sessionID: input.sessionID, client })
+      const last = await Session.messages({ sessionID: input.sessionID, limit: 1 })
+      const message = last.at(0)
+      if (message) return message
+      return await SessionPrompt.prompt({
+        sessionID: input.sessionID,
+        agent: agentName,
+        parts: [
+          {
+            type: "text",
+            text: "",
+          },
+        ],
+      })
+    }
+
+    if (!command)
+      return await SessionPrompt.prompt({
+        sessionID: input.sessionID,
+        agent: agentName,
+        parts: [
+          {
+            type: "text",
+            text: "",
+          },
+        ],
+      })
 
     const raw = input.arguments.match(argsRegex) ?? []
     const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))

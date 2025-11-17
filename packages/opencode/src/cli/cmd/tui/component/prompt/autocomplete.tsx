@@ -187,26 +187,9 @@ export function Autocomplete(props: {
     const results: AutocompleteOption[] = []
     const s = session()
 
-    // Plugin commands
-    for (const pluginCmd of sync.data.pluginCommand) {
-      if (pluginCmd.sessionOnly && !s) continue
-      results.push({
-        display: "/" + pluginCmd.name,
-        aliases: pluginCmd.aliases?.map((a) => "/" + a),
-        description: pluginCmd.description,
-        onSelect: async () => {
-          await sdk.client.pluginCommand.execute({
-            path: { name: pluginCmd.name },
-            body: { sessionID: props.sessionID },
-          })
-          // Clear the input
-          const cursor = props.input().logicalCursor
-          props.input().deleteRange(0, 0, cursor.row, cursor.col)
-        },
-      })
-    }
-
     for (const command of sync.data.command) {
+      if (command.sessionOnly && !s) continue
+
       results.push({
         display: "/" + command.name,
         description: command.description,

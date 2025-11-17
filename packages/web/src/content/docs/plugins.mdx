@@ -203,3 +203,40 @@ The `tool` helper creates a custom tool that opencode can call. It takes a Zod s
 - `execute`: Function that runs when the tool is called
 
 Your custom tools will be available to opencode alongside built-in tools.
+
+---
+
+### Slash commands
+
+Register custom slash commands that users can execute from the TUI:
+
+```ts title=".opencode/plugin/commands.ts"
+import type { Plugin } from "@opencode-ai/plugin"
+
+export const CommandsPlugin: Plugin = async (ctx) => {
+  return {
+    "plugin.command": {
+      hello: {
+        description: "Say hello",
+        aliases: ["hi"],
+        sessionOnly: true,
+        async execute({ sessionID, client }) {
+          await client.session.sendMessage({
+            path: { id: sessionID! },
+            body: { content: "Hello from plugin command!" },
+          })
+        },
+      },
+    },
+  }
+}
+```
+
+The `plugin.command` hook lets you define commands that appear in command listings. Each command has:
+
+- `description`: Brief description shown in autocomplete
+- `aliases`: Alternative names for the command (optional)
+- `sessionOnly`: Whether command requires an active session (optional)
+- `execute`: Function that runs when the command is invoked
+
+Commands are invoked by typing `/command-name` in the TUI.
