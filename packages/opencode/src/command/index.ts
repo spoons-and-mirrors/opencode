@@ -6,6 +6,7 @@ import { Instance } from "../project/instance"
 import { Identifier } from "../id/id"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
+import { Plugin } from "../plugin"
 
 export namespace Command {
   export const Event = {
@@ -28,6 +29,8 @@ export namespace Command {
       model: z.string().optional(),
       template: z.string(),
       subtask: z.boolean().optional(),
+      sessionOnly: z.boolean().optional(),
+      aliases: z.array(z.string()).optional(),
     })
     .meta({
       ref: "Command",
@@ -67,11 +70,33 @@ export namespace Command {
       }
     }
 
+    const plugins = await Plugin.list()
+    for (const plugin of plugins) {
+      const commands = plugin["plugin.command"]
+      if (!commands) continue
+      for (const [name, cmd] of Object.entries(commands)) {
+        if (result[name]) continue
+        result[name] = {
+          name,
+          description: cmd.description,
+          template: "",
+          sessionOnly: cmd.sessionOnly,
+          aliases: cmd.aliases,
+        }
+      }
+    }
+
     return result
   })
 
   export async function get(name: string) {
-    return state().then((x) => x[name])
+    const commands = await state()
+    if (commands[name]) return commands[name]
+    // Check aliases
+    for (const cmd of Object.values(commands)) {
+      if (cmd.aliases?.includes(name)) return cmd
+    }
+    return undefined
   }
 
   export async function list() {

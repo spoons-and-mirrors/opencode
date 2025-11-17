@@ -43,6 +43,7 @@ import { SessionStatus } from "./status"
 import { LLM } from "./llm"
 import { iife } from "@/util/iife"
 import { Shell } from "@/shell/shell"
+import { TuiEvent } from "@/cli/cmd/tui/event"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -1282,6 +1283,38 @@ export namespace SessionPrompt {
   export async function command(input: CommandInput) {
     log.info("command", input)
     const command = await Command.get(input.command)
+    if (!command) return
+
+    // Plugin commands have empty templates - execute them directly
+    if (command.template === "") {
+      const plugins = await Plugin.list()
+      for (const plugin of plugins) {
+        const pluginCommands = plugin["plugin.command"]
+        const pluginCommand = pluginCommands?.[command.name]
+        if (!pluginCommand) continue
+
+        const client = await Plugin.client()
+        try {
+          await pluginCommand.execute({ sessionID: input.sessionID, client })
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          log.error("plugin command failed", {
+            command: command.name,
+            error: errorMessage,
+          })
+          await Bus.publish(TuiEvent.ToastShow, {
+            title: `/${command.name} failed`,
+            message: errorMessage,
+            variant: "error",
+          })
+          throw error
+        }
+        const last = await Session.messages({ sessionID: input.sessionID, limit: 1 })
+        return last.at(0)
+      }
+      return
+    }
+
     const agentName = command.agent ?? input.agent ?? "build"
 
     const raw = input.arguments.match(argsRegex) ?? []
