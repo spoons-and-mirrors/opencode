@@ -865,6 +865,10 @@ export type AgentConfig = {
    * Hex color code for the agent (e.g., #FF5733)
    */
   color?: string
+  /**
+   * Additional instruction files or patterns to include for this agent
+   */
+  instructions?: Array<string>
   permission?: {
     edit?: "ask" | "allow" | "deny"
     bash?:
@@ -885,6 +889,7 @@ export type AgentConfig = {
       }
     | boolean
     | ("subagent" | "primary" | "all")
+    | Array<string>
     | {
         edit?: "ask" | "allow" | "deny"
         bash?:
@@ -1279,6 +1284,13 @@ export type Command = {
   subtask?: boolean
 }
 
+export type PluginCommand = Array<{
+  name: string
+  description: string
+  aliases?: Array<string>
+  sessionOnly?: boolean
+}>
+
 export type Model = {
   id: string
   name: string
@@ -1399,6 +1411,7 @@ export type Agent = {
     providerID: string
   }
   prompt?: string
+  instructions?: Array<string>
   tools: {
     [key: string]: boolean
   }
@@ -2458,6 +2471,65 @@ export type CommandListResponses = {
 }
 
 export type CommandListResponse = CommandListResponses[keyof CommandListResponses]
+
+export type PluginCommandListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/plugin/command"
+}
+
+export type PluginCommandListResponses = {
+  /**
+   * List of plugin commands
+   */
+  200: PluginCommand
+}
+
+export type PluginCommandListResponse = PluginCommandListResponses[keyof PluginCommandListResponses]
+
+export type PluginCommandExecuteData = {
+  body?: {
+    /**
+     * Session ID
+     */
+    sessionID?: string
+  }
+  path: {
+    /**
+     * Plugin command name
+     */
+    name: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/plugin/command/{name}/execute"
+}
+
+export type PluginCommandExecuteErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type PluginCommandExecuteError = PluginCommandExecuteErrors[keyof PluginCommandExecuteErrors]
+
+export type PluginCommandExecuteResponses = {
+  /**
+   * Command executed
+   */
+  200: boolean
+}
+
+export type PluginCommandExecuteResponse = PluginCommandExecuteResponses[keyof PluginCommandExecuteResponses]
 
 export type ConfigProvidersData = {
   body?: never

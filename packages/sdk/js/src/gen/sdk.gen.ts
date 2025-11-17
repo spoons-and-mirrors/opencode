@@ -90,6 +90,11 @@ import type {
   PostSessionIdPermissionsPermissionIdErrors,
   CommandListData,
   CommandListResponses,
+  PluginCommandListData,
+  PluginCommandListResponses,
+  PluginCommandExecuteData,
+  PluginCommandExecuteResponses,
+  PluginCommandExecuteErrors,
   ConfigProvidersData,
   ConfigProvidersResponses,
   FindTextData,
@@ -554,6 +559,36 @@ class Command extends _HeyApiClient {
   }
 }
 
+class PluginCommand extends _HeyApiClient {
+  /**
+   * List all plugin commands
+   */
+  public list<ThrowOnError extends boolean = false>(options?: Options<PluginCommandListData, ThrowOnError>) {
+    return (options?.client ?? this._client).get<PluginCommandListResponses, unknown, ThrowOnError>({
+      url: "/plugin/command",
+      ...options,
+    })
+  }
+
+  /**
+   * Execute a plugin command
+   */
+  public execute<ThrowOnError extends boolean = false>(options: Options<PluginCommandExecuteData, ThrowOnError>) {
+    return (options.client ?? this._client).post<
+      PluginCommandExecuteResponses,
+      PluginCommandExecuteErrors,
+      ThrowOnError
+    >({
+      url: "/plugin/command/{name}/execute",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+  }
+}
+
 class Find extends _HeyApiClient {
   /**
    * Find text in files
@@ -894,6 +929,7 @@ export class OpencodeClient extends _HeyApiClient {
   path = new Path({ client: this._client })
   session = new Session({ client: this._client })
   command = new Command({ client: this._client })
+  pluginCommand = new PluginCommand({ client: this._client })
   find = new Find({ client: this._client })
   file = new File({ client: this._client })
   app = new App({ client: this._client })
