@@ -167,4 +167,15 @@ export interface Hooks {
       metadata: any
     },
   ) => Promise<void>
+  /**
+   * Register custom plugin commands (accessible via /command in TUI)
+   */
+  "plugin.command"?: {
+    [key: string]: {
+      description: string
+      aliases?: string[]
+      sessionOnly?: boolean
+      execute(input: { sessionID?: string; client: ReturnType<typeof createOpencodeClient> }): Promise<void>
+    }
+  }
 }
