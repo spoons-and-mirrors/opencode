@@ -6,6 +6,7 @@ import { Instance } from "../project/instance"
 import { Identifier } from "../id/id"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
+import { Plugin } from "../plugin"
 
 export namespace Command {
   export const Event = {
@@ -28,6 +29,7 @@ export namespace Command {
       model: z.string().optional(),
       template: z.string(),
       subtask: z.boolean().optional(),
+      sessionOnly: z.boolean().optional(),
     })
     .meta({
       ref: "Command",
@@ -64,6 +66,29 @@ export namespace Command {
         description: command.description,
         template: command.template,
         subtask: command.subtask,
+      }
+    }
+
+    if (result[Default.INIT] === undefined) {
+      result[Default.INIT] = {
+        name: Default.INIT,
+        description: "create/update AGENTS.md",
+        template: PROMPT_INITIALIZE.replace("${path}", Instance.worktree),
+      }
+    }
+
+    const plugins = await Plugin.list()
+    for (const plugin of plugins) {
+      const commands = plugin["plugin.command"]
+      if (!commands) continue
+      for (const [name, cmd] of Object.entries(commands)) {
+        if (result[name]) continue
+        result[name] = {
+          name,
+          description: cmd.description,
+          template: "",
+          sessionOnly: cmd.sessionOnly,
+        }
       }
     }
 
