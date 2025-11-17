@@ -74,7 +74,7 @@ export const BatchTool = Tool.define("batch", async () => {
             },
           })
 
-          const result = await tool.execute(validatedParams, { ...ctx, callID: ctx.callID })
+          const result = await tool.execute(validatedParams, { ...ctx, callID: partID })
 
           await Session.updatePart({
             id: partID,
