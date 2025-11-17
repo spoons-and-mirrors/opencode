@@ -255,6 +255,7 @@ export namespace MessageV2 {
     tool: z.string(),
     state: ToolState,
     metadata: z.record(z.string(), z.any()).optional(),
+    synthetic: z.boolean().optional(),
   }).meta({
     ref: "ToolPart",
   })
@@ -575,6 +576,9 @@ export namespace MessageV2 {
                 },
               ]
             if (part.type === "tool") {
+              // Skip synthetic tool parts (e.g., batch sub-tools) - they're for display only
+              if (part.synthetic) return []
+
               if (part.state.status === "completed") {
                 if (part.state.attachments?.length) {
                   result.push({
