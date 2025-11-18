@@ -628,6 +628,7 @@ export type EventTuiCommandExecute = {
           | "session.share"
           | "session.interrupt"
           | "session.compact"
+          | "session.prune"
           | "session.page.up"
           | "session.page.down"
           | "session.half.page.up"
@@ -834,6 +835,10 @@ export type KeybindsConfig = {
    * Compact the session
    */
   session_compact?: string
+  /**
+   * Prune all tool call outputs from the session
+   */
+  session_prune?: string
   /**
    * Scroll messages up by one page
    */
@@ -2518,6 +2523,42 @@ export type SessionSummarizeResponses = {
 }
 
 export type SessionSummarizeResponse = SessionSummarizeResponses[keyof SessionSummarizeResponses]
+
+export type SessionPruneData = {
+  body?: never
+  path: {
+    /**
+     * Session ID
+     */
+    id: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{id}/prune"
+}
+
+export type SessionPruneErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionPruneError = SessionPruneErrors[keyof SessionPruneErrors]
+
+export type SessionPruneResponses = {
+  /**
+   * Pruned session
+   */
+  200: boolean
+}
+
+export type SessionPruneResponse = SessionPruneResponses[keyof SessionPruneResponses]
 
 export type SessionMessagesData = {
   body?: never
