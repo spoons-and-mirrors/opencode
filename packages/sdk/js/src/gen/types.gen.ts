@@ -597,6 +597,7 @@ export type EventTuiCommandExecute = {
           | "session.share"
           | "session.interrupt"
           | "session.compact"
+          | "session.prune"
           | "session.page.up"
           | "session.page.down"
           | "session.half.page.up"
@@ -741,6 +742,10 @@ export type KeybindsConfig = {
    * Compact the session
    */
   session_compact?: string
+  /**
+   * Prune all tool call outputs from the session
+   */
+  session_prune?: string
   /**
    * Scroll messages up by one page
    */
@@ -1284,13 +1289,6 @@ export type Command = {
   subtask?: boolean
   sessionOnly?: boolean
 }
-
-export type PluginCommand = Array<{
-  name: string
-  description: string
-  aliases?: Array<string>
-  sessionOnly?: boolean
-}>
 
 export type Model = {
   id: string
@@ -2125,6 +2123,42 @@ export type SessionSummarizeResponses = {
 
 export type SessionSummarizeResponse = SessionSummarizeResponses[keyof SessionSummarizeResponses]
 
+export type SessionPruneData = {
+  body?: never
+  path: {
+    /**
+     * Session ID
+     */
+    id: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{id}/prune"
+}
+
+export type SessionPruneErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionPruneError = SessionPruneErrors[keyof SessionPruneErrors]
+
+export type SessionPruneResponses = {
+  /**
+   * Pruned session
+   */
+  200: boolean
+}
+
+export type SessionPruneResponse = SessionPruneResponses[keyof SessionPruneResponses]
+
 export type SessionMessagesData = {
   body?: never
   path: {
@@ -2472,65 +2506,6 @@ export type CommandListResponses = {
 }
 
 export type CommandListResponse = CommandListResponses[keyof CommandListResponses]
-
-export type PluginCommandListData = {
-  body?: never
-  path?: never
-  query?: {
-    directory?: string
-  }
-  url: "/plugin/command"
-}
-
-export type PluginCommandListResponses = {
-  /**
-   * List of plugin commands
-   */
-  200: PluginCommand
-}
-
-export type PluginCommandListResponse = PluginCommandListResponses[keyof PluginCommandListResponses]
-
-export type PluginCommandExecuteData = {
-  body?: {
-    /**
-     * Session ID
-     */
-    sessionID?: string
-  }
-  path: {
-    /**
-     * Plugin command name
-     */
-    name: string
-  }
-  query?: {
-    directory?: string
-  }
-  url: "/plugin/command/{name}/execute"
-}
-
-export type PluginCommandExecuteErrors = {
-  /**
-   * Bad request
-   */
-  400: BadRequestError
-  /**
-   * Not found
-   */
-  404: NotFoundError
-}
-
-export type PluginCommandExecuteError = PluginCommandExecuteErrors[keyof PluginCommandExecuteErrors]
-
-export type PluginCommandExecuteResponses = {
-  /**
-   * Command executed
-   */
-  200: boolean
-}
-
-export type PluginCommandExecuteResponse = PluginCommandExecuteResponses[keyof PluginCommandExecuteResponses]
 
 export type ConfigProvidersData = {
   body?: never
