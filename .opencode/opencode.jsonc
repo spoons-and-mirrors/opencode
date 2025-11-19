@@ -3,47 +3,47 @@
   "plugin": ["opencode-openai-codex-auth"],
 
   "provider": {
-		"github-copilot": {
-			"models": {
-				"gpt-5-mini": {
-					"options": {
-						"reasoningEffort": "minimal",
-						"textVerbosity": "low"
-					}
-				},
-				"oswe-vscode-prime": {
-					"name": "Raptor Mini",
-					"options": {
-						"reasoningEffort": "medium",
-						"textVerbosity": "low"
-					}
-				},
-        	"gemini-3-pro-preview": {
-					"name": "Gemini 3 Pro Preview",
+    "github-copilot": {
+      "models": {
+        "gpt-5-mini": {
+          "options": {
+            "reasoningEffort": "minimal",
+            "textVerbosity": "low",
+          },
+        },
+        "oswe-vscode-prime": {
+          "name": "Raptor Mini",
+          "options": {
+            "reasoningEffort": "medium",
+            "textVerbosity": "low",
+          },
+        },
+        "gemini-3-pro-preview": {
+          "name": "Gemini 3 Pro Preview",
           "limit": {
             "context": 256000,
-            "output": 256000
+            "output": 256000,
           },
-				},
-				"gpt-5.1": {
-					"name": "GPT-5.1",
-					"limit": {
-						"context": 256000,
-						"output": 256000
-					},
-					"options": {
-						"reasoningEffort": "medium",
-						"textVerbosity": "low"
-					}
-				},
-				"gpt-5": {
-					"name": "GPT-5",
-					"options": {
-						"reasoningEffort": "medium",
-						"textVerbosity": "low"
-					}
-				}
-			}
-		}
-	},
+        },
+        "gpt-5.1": {
+          "name": "GPT-5.1",
+          "limit": {
+            "context": 256000,
+            "output": 256000,
+          },
+          "options": {
+            "reasoningEffort": "medium",
+            "textVerbosity": "low",
+          },
+        },
+        "gpt-5": {
+          "name": "GPT-5",
+          "options": {
+            "reasoningEffort": "medium",
+            "textVerbosity": "low",
+          },
+        },
+      },
+    },
+  },
 }
