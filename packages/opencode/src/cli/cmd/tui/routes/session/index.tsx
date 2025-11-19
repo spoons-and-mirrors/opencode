@@ -951,15 +951,51 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
         type: "idle",
       },
   )
+
+  const batch = createMemo(() => sync.data.config.experimental?.batch_tool === true)
+
+  const parts = createMemo(() => {
+    const items = props.parts
+    if (!batch()) return items
+    const seen = new Set<string>()
+    const out: Part[] = []
+
+    for (const item of items) {
+      if (item.type !== "tool") {
+        out.push(item)
+        continue
+      }
+
+      const tool = item as ToolPart
+      const state = tool.state
+      const base: Record<string, unknown> = {
+        tool: tool.tool,
+        status: state.status,
+        input: state.input,
+      }
+
+      if (state.status === "completed") base.output = state.output
+      if (state.status === "error") base.error = state.error
+
+      const key = JSON.stringify(base)
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(item)
+    }
+
+    return out
+  })
+
   return (
     <>
-      <For each={props.parts}>
+      <For each={parts()}>
         {(part, index) => {
           const component = createMemo(() => PART_MAPPING[part.type as keyof typeof PART_MAPPING])
+          const all = parts()
           return (
             <Show when={component()}>
               <Dynamic
-                last={index() === props.parts.length - 1}
+                last={index() === all.length - 1}
                 component={component()}
                 part={part as any}
                 message={props.message}
