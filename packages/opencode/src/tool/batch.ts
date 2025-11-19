@@ -40,9 +40,20 @@ export const BatchTool = Tool.define("batch", async () => {
       const availableTools = await ToolRegistry.tools("", "")
       const toolMap = new Map(availableTools.map((t) => [t.id, t]))
 
+      const uniqueCalls: typeof toolCalls = []
+      const seenCalls = new Set<string>()
+      for (const call of toolCalls) {
+        const key = JSON.stringify({ tool: call.tool, parameters: call.parameters })
+        if (seenCalls.has(key)) continue
+        seenCalls.add(key)
+        uniqueCalls.push(call)
+      }
+
       const executeCall = async (call: (typeof toolCalls)[0]) => {
         const callStartTime = Date.now()
         const partID = Identifier.ascending("part")
+        let done = false
+        const pending: Promise<unknown>[] = []
 
         try {
           if (DISALLOWED.has(call.tool)) {
@@ -56,25 +67,66 @@ export const BatchTool = Tool.define("batch", async () => {
             const availableToolsList = Array.from(toolMap.keys()).filter((name) => !FILTERED_FROM_SUGGESTIONS.has(name))
             throw new Error(`Tool '${call.tool}' not found. Available tools: ${availableToolsList.join(", ")}`)
           }
+
           const validatedParams = tool.parameters.parse(call.parameters)
 
-          await Session.updatePart({
-            id: partID,
-            messageID: ctx.messageID,
-            sessionID: ctx.sessionID,
-            type: "tool",
-            tool: call.tool,
-            callID: partID,
-            state: {
-              status: "running",
-              input: call.parameters,
-              time: {
-                start: callStartTime,
+          if (!done) {
+            const p = Session.updatePart({
+              id: partID,
+              messageID: ctx.messageID,
+
+              sessionID: ctx.sessionID,
+              type: "tool",
+              tool: call.tool,
+              callID: partID,
+              state: {
+                status: "running",
+                input: call.parameters,
+                time: {
+                  start: callStartTime,
+                },
               },
+            })
+            pending.push(p)
+            p.finally(() => {
+              const i = pending.indexOf(p)
+              if (i !== -1) pending.splice(i, 1)
+            })
+          }
+
+          const result = await tool.execute(validatedParams, {
+            ...ctx,
+            callID: partID,
+            metadata: (input) => {
+              if (done) return
+              const p = Session.updatePart({
+                id: partID,
+
+                messageID: ctx.messageID,
+                sessionID: ctx.sessionID,
+                type: "tool",
+                tool: call.tool,
+                callID: partID,
+                state: {
+                  status: "running",
+                  input: call.parameters,
+                  title: input.title,
+                  metadata: input.metadata,
+                  time: {
+                    start: callStartTime,
+                  },
+                },
+              })
+              pending.push(p)
+              p.finally(() => {
+                const i = pending.indexOf(p)
+                if (i !== -1) pending.splice(i, 1)
+              })
             },
           })
 
-          const result = await tool.execute(validatedParams, { ...ctx, callID: partID })
+          done = true
+          await Promise.all(pending)
 
           await Session.updatePart({
             id: partID,
@@ -99,6 +151,9 @@ export const BatchTool = Tool.define("batch", async () => {
 
           return { success: true as const, tool: call.tool, result }
         } catch (error) {
+          done = true
+          await Promise.all(pending)
+
           await Session.updatePart({
             id: partID,
             messageID: ctx.messageID,
@@ -121,7 +176,7 @@ export const BatchTool = Tool.define("batch", async () => {
         }
       }
 
-      const results = await Promise.all(toolCalls.map((call) => executeCall(call)))
+      const results = await Promise.all(uniqueCalls.map((call) => executeCall(call)))
 
       // Add discarded calls as errors
       const now = Date.now()
@@ -159,7 +214,6 @@ export const BatchTool = Tool.define("batch", async () => {
       return {
         title: `Batch execution (${successfulCalls}/${results.length} successful)`,
         output: outputMessage,
-        attachments: results.filter((result) => result.success).flatMap((r) => r.result.attachments ?? []),
         metadata: {
           totalCalls: results.length,
           successful: successfulCalls,
