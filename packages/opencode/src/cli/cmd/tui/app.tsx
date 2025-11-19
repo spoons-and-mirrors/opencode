@@ -2,7 +2,18 @@ import { render, useKeyboard, useRenderer, useTerminalDimensions } from "@opentu
 import { Clipboard } from "@tui/util/clipboard"
 import { TextAttributes } from "@opentui/core"
 import { RouteProvider, useRoute } from "@tui/context/route"
-import { Switch, Match, createEffect, untrack, ErrorBoundary, createSignal, onMount, batch } from "solid-js"
+import {
+  Switch,
+  Match,
+  Show,
+  createEffect,
+  untrack,
+  ErrorBoundary,
+  createSignal,
+  onMount,
+  batch,
+  createMemo,
+} from "solid-js"
 import { Installation } from "@/installation"
 import { Global } from "@/global"
 import { DialogProvider, useDialog } from "@tui/ui/dialog"
@@ -29,6 +40,7 @@ import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
 import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
+import { Locale } from "@/util/locale"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -455,7 +467,7 @@ function App() {
           <text fg={theme.textMuted} paddingRight={1}>
             tab
           </text>
-          <text fg={local.agent.color(local.agent.current().name)}>{""}</text>
+          <text fg={local.agent.color(local.agent.current().name)}>{"\ue0b2"}</text>
           <text bg={local.agent.color(local.agent.current().name)} fg={theme.background} wrapMode={undefined}>
             <span style={{ bold: true }}> {local.agent.current().name.toUpperCase()}</span>
             <span> AGENT </span>

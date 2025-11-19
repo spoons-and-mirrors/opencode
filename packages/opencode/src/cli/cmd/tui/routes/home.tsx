@@ -19,23 +19,34 @@ export function Home() {
     return Object.values(sync.data.mcp).some((x) => x.status === "failed")
   })
 
+  const plugins = createMemo(() => (sync.data.config.plugin ?? []).length)
+
   const Hint = (
-    <Show when={Object.keys(sync.data.mcp).length > 0}>
-      <box flexShrink={0} flexDirection="row" gap={1}>
-        <text fg={theme.text}>
-          <Switch>
-            <Match when={mcpError()}>
-              <span style={{ fg: theme.error }}>•</span> mcp errors{" "}
-              <span style={{ fg: theme.textMuted }}>ctrl+x s</span>
-            </Match>
-            <Match when={true}>
-              <span style={{ fg: theme.success }}>•</span>{" "}
-              {Locale.pluralize(Object.values(sync.data.mcp).length, "{} mcp server", "{} mcp servers")}
-            </Match>
-          </Switch>
-        </text>
-      </box>
-    </Show>
+    <box flexShrink={0} flexDirection="column" gap={0}>
+      <Show when={Object.keys(sync.data.mcp).length > 0}>
+        <box flexDirection="row" gap={1}>
+          <text fg={theme.text}>
+            <Switch>
+              <Match when={mcpError()}>
+                <span style={{ fg: theme.error }}>•</span> mcp errors{" "}
+                <span style={{ fg: theme.textMuted }}>ctrl+x s</span>
+              </Match>
+              <Match when={true}>
+                <span style={{ fg: theme.success }}>•</span>{" "}
+                {Locale.pluralize(Object.values(sync.data.mcp).length, "{} mcp server", "{} mcp servers")}
+              </Match>
+            </Switch>
+          </text>
+        </box>
+      </Show>
+      <Show when={plugins() > 0}>
+        <box flexDirection="row" gap={1}>
+          <text fg={theme.text}>
+            <span style={{ fg: theme.success }}>•</span> {Locale.pluralize(plugins(), "{} plugin", "{} plugins")}
+          </text>
+        </box>
+      </Show>
+    </box>
   )
 
   let prompt: PromptRef
