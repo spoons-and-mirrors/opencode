@@ -383,6 +383,8 @@ export type Part =
       prompt: string
       description: string
       agent: string
+      returnPrompt?: string
+      model?: string
     }
   | ReasoningPart
   | FilePart
@@ -1005,6 +1007,7 @@ export type Config = {
       agent?: string
       model?: string
       subtask?: boolean
+      returnPrompt?: string
     }
   }
   watcher?: {
@@ -1294,6 +1297,8 @@ export type SubtaskPartInput = {
   prompt: string
   description: string
   agent: string
+  returnPrompt?: string
+  model?: string
 }
 
 export type Command = {
@@ -1303,6 +1308,7 @@ export type Command = {
   model?: string
   template: string
   subtask?: boolean
+  returnPrompt?: string
 }
 
 export type Model = {
