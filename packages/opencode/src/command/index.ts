@@ -29,6 +29,7 @@ export namespace Command {
       model: z.string().optional(),
       template: z.string(),
       subtask: z.boolean().optional(),
+      exitTask: z.string().optional(),
       sessionOnly: z.boolean().optional(),
     })
     .meta({
@@ -66,6 +67,7 @@ export namespace Command {
         description: command.description,
         template: command.template,
         subtask: command.subtask,
+        exitTask: command.exitTask,
       }
     }
 
