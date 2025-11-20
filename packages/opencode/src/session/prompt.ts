@@ -319,6 +319,8 @@ export namespace SessionPrompt {
               prompt: task.prompt,
               description: task.description,
               subagent_type: task.agent,
+              exitTask: task.exitTask,
+              model: task.model,
             },
             time: {
               start: Date.now(),
@@ -331,6 +333,8 @@ export namespace SessionPrompt {
               prompt: task.prompt,
               description: task.description,
               subagent_type: task.agent,
+              exitTask: task.exitTask,
+              model: task.model,
             },
             {
               agent: task.agent,
@@ -1293,7 +1297,7 @@ export namespace SessionPrompt {
   export async function command(input: CommandInput) {
     log.info("command", input)
     const command = await Command.get(input.command)
-    const agentName = command?.agent ?? input.agent ?? "build"
+    const agentName = input.agent ?? "build"
 
     const plugins = await Plugin.list()
     for (const plugin of plugins) {
@@ -1366,28 +1370,24 @@ export namespace SessionPrompt {
     }
     template = template.trim()
 
-    const model = await (async () => {
-      if (command.model) {
-        return Provider.parseModel(command.model)
-      }
-      if (command.agent) {
-        const cmdAgent = await Agent.get(command.agent)
-        if (cmdAgent.model) {
-          return cmdAgent.model
-        }
-      }
-      if (input.model) return Provider.parseModel(input.model)
-      return await lastModel(input.sessionID)
-    })()
     const agent = await Agent.get(agentName)
+    const parentModel = input.model
+      ? Provider.parseModel(input.model)
+      : (agent.model ?? (await lastModel(input.sessionID)))
+
+    const subtaskAgentName = command.agent ?? agentName
+    const subtaskAgent = await Agent.get(subtaskAgentName)
+    const subtaskModel = command.model ? Provider.parseModel(command.model) : (subtaskAgent.model ?? parentModel)
 
     const parts =
-      (agent.mode === "subagent" && command.subtask !== false) || command.subtask === true
+      (subtaskAgent.mode === "subagent" && command.subtask !== false) || command.subtask === true
         ? [
             {
               type: "subtask" as const,
-              agent: agent.name,
+              agent: subtaskAgent.name,
               description: command.description ?? "",
+              exitTask: command.exitTask,
+              model: command.model,
               // TODO: how can we make task tool accept a more complex input?
               prompt: await resolvePromptParts(template).then((x) => x.find((y) => y.type === "text")?.text ?? ""),
             },
@@ -1397,7 +1397,7 @@ export namespace SessionPrompt {
     const result = (await prompt({
       sessionID: input.sessionID,
       messageID: input.messageID,
-      model,
+      model: parentModel,
       agent: agentName,
       parts,
     })) as MessageV2.WithParts

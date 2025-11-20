@@ -7,6 +7,7 @@ import { MessageV2 } from "../session/message-v2"
 import { Identifier } from "../id/id"
 import { Agent } from "../agent/agent"
 import { SessionPrompt } from "../session/prompt"
+import { Provider } from "../provider/provider"
 import { iife } from "@/util/iife"
 import { defer } from "@/util/defer"
 
@@ -25,6 +26,8 @@ export const TaskTool = Tool.define("task", async () => {
       prompt: z.string().describe("The task for the agent to perform"),
       subagent_type: z.string().describe("The type of specialized agent to use for this task"),
       session_id: z.string().describe("Existing Task session to continue").optional(),
+      exitTask: z.string().describe("Optional instructions for resuming in the parent session").optional(),
+      model: z.string().describe("Optional model override in provider/model form").optional(),
     }),
     async execute(params, ctx) {
       const agent = await Agent.get(params.subagent_type)
@@ -66,10 +69,12 @@ export const TaskTool = Tool.define("task", async () => {
         })
       })
 
-      const model = agent.model ?? {
-        modelID: msg.info.modelID,
-        providerID: msg.info.providerID,
-      }
+      const model = params.model
+        ? Provider.parseModel(params.model)
+        : (agent.model ?? {
+            modelID: msg.info.modelID,
+            providerID: msg.info.providerID,
+          })
 
       function cancel() {
         SessionPrompt.cancel(session.id)
@@ -100,7 +105,9 @@ export const TaskTool = Tool.define("task", async () => {
       all = all.flatMap((msg) => msg.parts.filter((x: any) => x.type === "tool") as MessageV2.ToolPart[])
       const text = result.parts.findLast((x) => x.type === "text")?.text ?? ""
 
-      const output = text + "\n\n" + ["<task_metadata>", `session_id: ${session.id}`, "</task_metadata>"].join("\n")
+      const exit = params.exitTask ? `\n\n${params.exitTask}` : ""
+      const output =
+        text + exit + "\n\n" + ["<task_metadata>", `session_id: ${session.id}`, "</task_metadata>"].join("\n")
 
       return {
         title: params.description,
