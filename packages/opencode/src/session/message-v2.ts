@@ -156,6 +156,8 @@ export namespace MessageV2 {
     prompt: z.string(),
     description: z.string(),
     agent: z.string(),
+    returnPrompt: z.string().optional(),
+    model: z.string().optional(),
   })
   export type SubtaskPart = z.infer<typeof SubtaskPart>
 

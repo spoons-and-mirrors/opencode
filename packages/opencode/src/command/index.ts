@@ -30,6 +30,7 @@ export namespace Command {
       model: z.string().optional(),
       template: z.string(),
       subtask: z.boolean().optional(),
+      returnPrompt: z.string().optional(),
     })
     .meta({
       ref: "Command",
@@ -49,6 +50,7 @@ export namespace Command {
         description: command.description,
         template: command.template,
         subtask: command.subtask,
+        returnPrompt: command.returnPrompt,
       }
     }
 
