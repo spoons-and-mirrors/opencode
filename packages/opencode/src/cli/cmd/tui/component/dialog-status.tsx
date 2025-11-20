@@ -18,20 +18,20 @@ export function DialogStatus() {
         const path = value.substring("file://".length)
         const parts = path.split("/")
         const filename = parts.pop() || path
-        if (!filename.includes(".")) return { raw: value, name: filename }
+        if (!filename.includes(".")) return { name: filename }
         const basename = filename.split(".")[0]
         if (basename === "index") {
           const dirname = parts.pop()
           const name = dirname || basename
-          return { raw: value, name }
+          return { name }
         }
-        return { raw: value, name: basename }
+        return { name: basename }
       }
       const index = value.lastIndexOf("@")
-      if (index <= 0) return { raw: value, name: value, version: "latest" }
+      if (index <= 0) return { name: value, version: "latest" }
       const name = value.substring(0, index)
       const version = value.substring(index + 1)
-      return { raw: value, name, version }
+      return { name, version }
     })
     return result.toSorted((a, b) => a.name.localeCompare(b.name))
   })
