@@ -109,6 +109,7 @@ export namespace MessageV2 {
     type: z.literal("text"),
     text: z.string(),
     synthetic: z.boolean().optional(),
+    userSynthetic: z.boolean().optional(),
     time: z
       .object({
         start: z.number(),
@@ -487,7 +488,7 @@ export namespace MessageV2 {
           id: msg.info.id,
           role: "user",
           parts: msg.parts.flatMap((part): UIMessage["parts"] => {
-            if (part.type === "text")
+            if (part.type === "text" && !part.userSynthetic)
               return [
                 {
                   type: "text",

@@ -1026,9 +1026,10 @@ type Part struct {
 	// This field can have the runtime type of [FilePartSource], [AgentPartSource].
 	Source interface{} `json:"source"`
 	// This field can have the runtime type of [ToolPartState].
-	State     interface{} `json:"state"`
-	Synthetic bool        `json:"synthetic"`
-	Text      string      `json:"text"`
+	State         interface{} `json:"state"`
+	Synthetic     bool        `json:"synthetic"`
+	UserSynthetic bool        `json:"userSynthetic"`
+	Text          string      `json:"text"`
 	// This field can have the runtime type of [TextPartTime], [ReasoningPartTime].
 	Time interface{} `json:"time"`
 	// This field can have the runtime type of [StepFinishPartTokens].
@@ -1041,29 +1042,30 @@ type Part struct {
 
 // partJSON contains the JSON metadata for the struct [Part]
 type partJSON struct {
-	ID          apijson.Field
-	MessageID   apijson.Field
-	SessionID   apijson.Field
-	Type        apijson.Field
-	CallID      apijson.Field
-	Cost        apijson.Field
-	Filename    apijson.Field
-	Files       apijson.Field
-	Hash        apijson.Field
-	Metadata    apijson.Field
-	Mime        apijson.Field
-	Name        apijson.Field
-	Snapshot    apijson.Field
-	Source      apijson.Field
-	State       apijson.Field
-	Synthetic   apijson.Field
-	Text        apijson.Field
-	Time        apijson.Field
-	Tokens      apijson.Field
-	Tool        apijson.Field
-	URL         apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
+	ID            apijson.Field
+	MessageID     apijson.Field
+	SessionID     apijson.Field
+	Type          apijson.Field
+	CallID        apijson.Field
+	Cost          apijson.Field
+	Filename      apijson.Field
+	Files         apijson.Field
+	Hash          apijson.Field
+	Metadata      apijson.Field
+	Mime          apijson.Field
+	Name          apijson.Field
+	Snapshot      apijson.Field
+	Source        apijson.Field
+	State         apijson.Field
+	Synthetic     apijson.Field
+	UserSynthetic apijson.Field
+	Text          apijson.Field
+	Time          apijson.Field
+	Tokens        apijson.Field
+	Tool          apijson.Field
+	URL           apijson.Field
+	raw           string
+	ExtraFields   map[string]apijson.Field
 }
 
 func (r partJSON) RawJSON() string {
@@ -1724,27 +1726,29 @@ func (r SymbolSourceRangeStartParam) MarshalJSON() (data []byte, err error) {
 }
 
 type TextPart struct {
-	ID        string       `json:"id,required"`
-	MessageID string       `json:"messageID,required"`
-	SessionID string       `json:"sessionID,required"`
-	Text      string       `json:"text,required"`
-	Type      TextPartType `json:"type,required"`
-	Synthetic bool         `json:"synthetic"`
-	Time      TextPartTime `json:"time"`
-	JSON      textPartJSON `json:"-"`
+	ID            string       `json:"id,required"`
+	MessageID     string       `json:"messageID,required"`
+	SessionID     string       `json:"sessionID,required"`
+	Text          string       `json:"text,required"`
+	Type          TextPartType `json:"type,required"`
+	Synthetic     bool         `json:"synthetic"`
+	UserSynthetic bool         `json:"userSynthetic"`
+	Time          TextPartTime `json:"time"`
+	JSON          textPartJSON `json:"-"`
 }
 
 // textPartJSON contains the JSON metadata for the struct [TextPart]
 type textPartJSON struct {
-	ID          apijson.Field
-	MessageID   apijson.Field
-	SessionID   apijson.Field
-	Text        apijson.Field
-	Type        apijson.Field
-	Synthetic   apijson.Field
-	Time        apijson.Field
-	raw         string
-	ExtraFields map[string]apijson.Field
+	ID            apijson.Field
+	MessageID     apijson.Field
+	SessionID     apijson.Field
+	Text          apijson.Field
+	Type          apijson.Field
+	Synthetic     apijson.Field
+	UserSynthetic apijson.Field
+	Time          apijson.Field
+	raw           string
+	ExtraFields   map[string]apijson.Field
 }
 
 func (r *TextPart) UnmarshalJSON(data []byte) (err error) {
@@ -1794,11 +1798,12 @@ func (r textPartTimeJSON) RawJSON() string {
 }
 
 type TextPartInputParam struct {
-	Text      param.Field[string]                 `json:"text,required"`
-	Type      param.Field[TextPartInputType]      `json:"type,required"`
-	ID        param.Field[string]                 `json:"id"`
-	Synthetic param.Field[bool]                   `json:"synthetic"`
-	Time      param.Field[TextPartInputTimeParam] `json:"time"`
+	Text          param.Field[string]                 `json:"text,required"`
+	Type          param.Field[TextPartInputType]      `json:"type,required"`
+	ID            param.Field[string]                 `json:"id"`
+	Synthetic     param.Field[bool]                   `json:"synthetic"`
+	UserSynthetic param.Field[bool]                   `json:"userSynthetic"`
+	Time          param.Field[TextPartInputTimeParam] `json:"time"`
 }
 
 func (r TextPartInputParam) MarshalJSON() (data []byte, err error) {
