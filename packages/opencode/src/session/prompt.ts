@@ -291,6 +291,7 @@ export namespace SessionPrompt {
       // TODO: centralize "invoke tool" logic
       if (task?.type === "subtask") {
         const taskTool = await TaskTool.init()
+        const taskModel = task.model ? Provider.parseModel(task.model) : model
         const assistantMessage = (await Session.updateMessage({
           id: Identifier.ascending("message"),
           role: "assistant",
@@ -308,8 +309,8 @@ export namespace SessionPrompt {
             reasoning: 0,
             cache: { read: 0, write: 0 },
           },
-          modelID: model.modelID,
-          providerID: model.providerID,
+          modelID: taskModel.modelID,
+          providerID: taskModel.providerID,
           time: {
             created: Date.now(),
           },
@@ -1354,20 +1355,16 @@ export namespace SessionPrompt {
     template = template.trim()
 
     const agent = await Agent.get(agentName)
-    const parentModel = input.model
-      ? Provider.parseModel(input.model)
-      : (agent.model ?? (await lastModel(input.sessionID)))
+    const model = input.model ? Provider.parseModel(input.model) : (agent.model ?? (await lastModel(input.sessionID)))
 
-    const subtaskAgentName = command.agent ?? agentName
-    const subtaskAgent = await Agent.get(subtaskAgentName)
-    const subtaskModel = command.model ? Provider.parseModel(command.model) : (subtaskAgent.model ?? parentModel)
+    const cmdAgent = command.agent ? await Agent.get(command.agent) : agent
 
     const parts =
-      (subtaskAgent.mode === "subagent" && command.subtask !== false) || command.subtask === true
+      (cmdAgent.mode === "subagent" && command.subtask !== false) || command.subtask === true
         ? [
             {
               type: "subtask" as const,
-              agent: subtaskAgent.name,
+              agent: cmdAgent.name,
               description: command.description ?? "",
               returnPrompt: command.returnPrompt,
               model: command.model,
@@ -1380,7 +1377,7 @@ export namespace SessionPrompt {
     const result = (await prompt({
       sessionID: input.sessionID,
       messageID: input.messageID,
-      model: parentModel,
+      model,
       agent: agentName,
       parts,
     })) as MessageV2.WithParts
