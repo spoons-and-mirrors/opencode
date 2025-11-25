@@ -5,6 +5,28 @@
   //   "url": "https://enterprise.dev.opencode.ai",
   // },
   "instructions": ["STYLE_GUIDE.md"],
+ 
+  "mcp": {
+		"context7": {
+			"enabled": true,
+			"type": "local",
+			"command": ["npx", "-y", "@upstash/context7-mcp"]
+		},
+		"gh_grep": {
+			"enabled": true,
+			"type": "remote",
+			"url": "https://mcp.grep.app"
+		},
+		"deepwiki": {
+			"enabled": true,
+			"type": "remote",
+			"url": "https://mcp.deepwiki.com/sse"
+		},
+     "exa": {
+      "type": "remote",
+      "url": "https://mcp.exa.ai/mcp",
+    },
+	},
   "provider": {
     "github-copilot": {
       "models": {
@@ -49,18 +71,8 @@
       },
     },
   },
-  "mcp": {
-    "exa": {
-      "type": "remote",
-      "url": "https://mcp.exa.ai/mcp",
-    },
-    "morph": {
-      "type": "local",
-      "command": ["bunx", "@morphllm/morphmcp"],
-      "environment": {
-        "ENABLED_TOOLS": "warp_grep",
-      },
-    },
-  },
-  "mcp": {},
+
+  "experimental": {
+     "batch_tool": false,
+    }
 }
