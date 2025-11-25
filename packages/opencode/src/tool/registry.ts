@@ -10,6 +10,7 @@ import { TodoWriteTool, TodoReadTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
+import { MCPRegistryTool } from "./mcp-registry"
 import type { Agent } from "../agent/agent"
 import { Tool } from "./tool"
 import { Instance } from "../project/instance"
@@ -98,6 +99,7 @@ export namespace ToolRegistry {
       TodoWriteTool,
       TodoReadTool,
       ...(config.experimental?.batch_tool === true ? [BatchTool] : []),
+      ...(config.experimental?.mcp_registry === true ? [MCPRegistryTool] : []),
       ...(Flag.OPENCODE_EXPERIMENTAL_EXA ? [WebSearchTool, CodeSearchTool] : []),
       ...custom,
     ]

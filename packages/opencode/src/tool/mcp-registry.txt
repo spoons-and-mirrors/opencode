@@ -1,0 +1,8 @@
+Activate MCP tools from connected servers.
+
+To use an MCP tool, you must first activate it using this tool. Once activated, the tool becomes available in this environment for a few turns.
+
+Usage:
+- Review the available MCP tools listed below
+- Call this tool with the exact tool name(s) you want to activate
+- Once activated, the tools and their descriptions are available in context so you can use them directly

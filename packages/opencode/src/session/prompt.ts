@@ -33,6 +33,7 @@ import { mergeDeep, pipe } from "remeda"
 import { ToolRegistry } from "../tool/registry"
 import { Wildcard } from "../util/wildcard"
 import { MCP } from "../mcp"
+import { getActivatedTools, decrementActivatedTools } from "../tool/mcp-registry"
 import { LSP } from "../lsp"
 import { ReadTool } from "../tool/read"
 import { ListTool } from "../tool/ls"
@@ -41,6 +42,7 @@ import { ulid } from "ulid"
 import { spawn } from "child_process"
 import { Command } from "../command"
 import { $, fileURLToPath } from "bun"
+import { Config } from "../config/config"
 import { ConfigMarkdown } from "../config/markdown"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@/util/error"
@@ -196,6 +198,7 @@ export namespace SessionPrompt {
 
     const message = await createUserMessage(input)
     await Session.touch(input.sessionID)
+    decrementActivatedTools(input.sessionID)
 
     if (input.noReply === true) {
       return message
@@ -468,7 +471,7 @@ export namespace SessionPrompt {
         agent,
         system: lastUser.system,
       })
-      const tools = await resolveTools({
+      const { tools, hiddenTools } = await resolveTools({
         agent,
         sessionID,
         model: lastUser.model,
@@ -544,7 +547,7 @@ export namespace SessionPrompt {
           },
           // set to 0, we handle loop
           maxRetries: 0,
-          activeTools: Object.keys(tools).filter((x) => x !== "invalid"),
+          activeTools: Object.keys(tools).filter((x) => x !== "invalid" && !hiddenTools.has(x)),
           maxOutputTokens: ProviderTransform.maxOutputTokens(
             model.providerID,
             params.options,
@@ -651,6 +654,7 @@ export namespace SessionPrompt {
     processor: SessionProcessor.Info
   }) {
     const tools: Record<string, AITool> = {}
+    const hiddenTools = new Set<string>()
     const enabledTools = pipe(
       input.agent.tools,
       mergeDeep(await ToolRegistry.enabled(input.model.providerID, input.model.modelID, input.agent)),
@@ -724,6 +728,9 @@ export namespace SessionPrompt {
       })
     }
 
+    const config = await Config.get()
+    const mcpRegistryEnabled = config.experimental?.mcp_registry === true
+    const activatedTools = mcpRegistryEnabled ? getActivatedTools(input.sessionID) : undefined
     for (const [key, item] of Object.entries(await MCP.tools())) {
       if (Wildcard.all(key, enabledTools) === false) continue
       const execute = item.execute
@@ -786,8 +793,11 @@ export namespace SessionPrompt {
         }
       }
       tools[key] = item
+      if (activatedTools && !activatedTools.has(key)) {
+        hiddenTools.add(key)
+      }
     }
-    return tools
+    return { tools, hiddenTools }
   }
 
   async function createUserMessage(input: PromptInput) {

@@ -40,6 +40,7 @@ import type { EditTool } from "@/tool/edit"
 import type { PatchTool } from "@/tool/patch"
 import type { WebFetchTool } from "@/tool/webfetch"
 import type { TaskTool } from "@/tool/task"
+import type { MCPRegistryTool } from "@/tool/mcp-registry"
 import { useKeyboard, useRenderer, useTerminalDimensions, type BoxProps, type JSX } from "@opentui/solid"
 import { useSDK } from "@tui/context/sdk"
 import { useCommandDialog } from "@tui/component/dialog-command"
@@ -1224,7 +1225,7 @@ type ToolProps<T extends Tool.Info> = {
 }
 function GenericTool(props: ToolProps<any>) {
   return (
-    <ToolTitle icon="⚙" fallback="Writing command..." when={true}>
+    <ToolTitle icon="▣" fallback="Writing command..." when={true}>
       {props.tool} {input(props.input)}
     </ToolTitle>
   )
@@ -1617,6 +1618,19 @@ ToolRegistry.register<typeof TodoWriteTool>({
           </box>
         </Show>
       </>
+    )
+  },
+})
+
+ToolRegistry.register<typeof MCPRegistryTool>({
+  name: "mcp_registry",
+  container: "inline",
+  render(props) {
+    const activate = props.input.activate
+    return (
+      <ToolTitle icon="→" fallback="Activating MCP tools..." when={activate?.length}>
+        MCP Registry activate [{activate?.join(", ")}]
+      </ToolTitle>
     )
   },
 })
