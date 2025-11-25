@@ -1218,6 +1218,10 @@ export type Config = {
      * Enable the batch tool
      */
     batch_tool?: boolean
+    /**
+     * Hide MCP tools behind a registry tool that the model can query
+     */
+    mcp_registry?: boolean
   }
 }
 

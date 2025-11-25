@@ -40,7 +40,7 @@ function activateTool(sessionID: string, toolName: string) {
 
 export const MCPRegistryTool = Tool.define("mcp_registry", async () => {
   const mcpTools = await MCP.tools()
-  const names = Object.keys(mcpTools)
+  const names = Object.keys(mcpTools).map((n) => n.replaceAll("-", "_"))
   const description = `${DESCRIPTION}\n\nAvailable MCP tools: [${names.join(", ")}]`
 
   return {
