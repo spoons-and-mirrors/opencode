@@ -312,6 +312,39 @@ This is an **optional** config option.
 
 ---
 
+### Return Prompt
+
+Use the `returnPrompt` option to provide instructions that are appended to the subagent's response when it returns to the parent session. This is useful for guiding what the parent agent should do next after the subtask completes.
+
+```json title="opencode.json"
+{
+  "command": {
+    "research": {
+      "agent": "general",
+      "subtask": true,
+      "returnPrompt": "Challenge, verify and validate the plan before implementing it."
+    }
+  }
+}
+```
+
+Or in markdown format:
+
+```md title=".opencode/command/research.md"
+---
+description: Research and implement
+agent: general
+subtask: true
+returnPrompt: Challenge, verify and validate the plan before implementing it.
+---
+
+Research how to implement $ARGUMENTS and provide a detailed plan.
+```
+
+This is an **optional** config option. Only applies when the command runs as a subtask.
+
+---
+
 ## Built-in
 
 opencode includes several built-in commands like `/init`, `/undo`, `/redo`, `/share`, `/help`; [learn more](/docs/tui#commands).
