@@ -391,6 +391,8 @@ export type Part =
       prompt: string
       description: string
       agent: string
+      exitTask?: string
+      model?: string
     }
   | ReasoningPart
   | FilePart
@@ -1199,6 +1201,7 @@ export type Config = {
       agent?: string
       model?: string
       subtask?: boolean
+      exitTask?: string
     }
   }
   watcher?: {
@@ -1423,6 +1426,8 @@ export type SubtaskPartInput = {
   prompt: string
   description: string
   agent: string
+  exitTask?: string
+  model?: string
 }
 
 export type Command = {
@@ -1432,6 +1437,7 @@ export type Command = {
   model?: string
   template: string
   subtask?: boolean
+  exitTask?: string
   sessionOnly?: boolean
 }
 
