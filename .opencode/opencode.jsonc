@@ -6,27 +6,28 @@
   // },
   "instructions": ["STYLE_GUIDE.md"],
  
+
   "mcp": {
-		"context7": {
-			"enabled": true,
-			"type": "local",
-			"command": ["npx", "-y", "@upstash/context7-mcp"]
-		},
-		"gh_grep": {
-			"enabled": true,
-			"type": "remote",
-			"url": "https://mcp.grep.app"
-		},
-		"deepwiki": {
-			"enabled": true,
-			"type": "remote",
-			"url": "https://mcp.deepwiki.com/sse"
-		},
-     "exa": {
+    "context7": {
+      "enabled": true,
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/context7-mcp"],
+    },
+    "gh_grep": {
+      "enabled": true,
+      "type": "remote",
+      "url": "https://mcp.grep.app",
+    },
+    "deepwiki": {
+      "enabled": true,
+      "type": "remote",
+      "url": "https://mcp.deepwiki.com/sse",
+    },
+    "exa": {
       "type": "remote",
       "url": "https://mcp.exa.ai/mcp",
     },
-	},
+  },
   "provider": {
     "github-copilot": {
       "models": {
@@ -73,6 +74,7 @@
   },
 
   "experimental": {
-     "batch_tool": false,
-    }
+    "batch_tool": false,
+    "mcp_registry": false,
+  },
 }
