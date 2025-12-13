@@ -38,17 +38,15 @@ export namespace FileTime {
     const nextLock = new Promise<void>((resolve) => {
       release = resolve
     })
-    current.locks.set(
-      filepath,
-      currentLock.then(() => nextLock),
-    )
+    const chained = currentLock.then(() => nextLock)
+    current.locks.set(filepath, chained)
     await currentLock
     try {
       const result = await fn()
       return result
     } finally {
       release()
-      if (current.locks.get(filepath) === nextLock) {
+      if (current.locks.get(filepath) === chained) {
         current.locks.delete(filepath)
       }
     }
