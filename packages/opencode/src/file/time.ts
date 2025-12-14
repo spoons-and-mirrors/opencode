@@ -42,8 +42,7 @@ export namespace FileTime {
     current.locks.set(filepath, chained)
     await currentLock
     try {
-      const result = await fn()
-      return result
+      return await fn()
     } finally {
       release()
       if (current.locks.get(filepath) === chained) {
