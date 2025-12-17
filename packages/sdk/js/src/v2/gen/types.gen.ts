@@ -405,6 +405,7 @@ export type CompactionPart = {
   messageID: string
   type: "compaction"
   auto: boolean
+  args?: string
 }
 
 export type Part =
@@ -2733,6 +2734,7 @@ export type SessionSummarizeData = {
   body?: {
     providerID: string
     modelID: string
+    args?: string
   }
   path: {
     /**

@@ -509,6 +509,14 @@ export function Prompt(props: PromptProps) {
         command: inputText,
       })
       setStore("mode", "normal")
+    } else if (inputText.match(/^\/(compact|summarize)(\s|$)/)) {
+      const args = inputText.replace(/^\/(compact|summarize)\s*/, "")
+      sdk.client.session.summarize({
+        sessionID,
+        modelID: selectedModel.modelID,
+        providerID: selectedModel.providerID,
+        args: args || undefined,
+      })
     } else if (
       inputText.startsWith("/") &&
       iife(() => {

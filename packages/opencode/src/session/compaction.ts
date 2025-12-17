@@ -91,6 +91,9 @@ export namespace SessionCompaction {
     auto: boolean
   }) {
     const userMessage = input.messages.findLast((m) => m.info.id === input.parentID)!.info as MessageV2.User
+    const compactionPart = input.messages
+      .findLast((m) => m.info.id === input.parentID)!
+      .parts.find((p): p is MessageV2.CompactionPart => p.type === "compaction")
     const agent = await Agent.get("compaction")
     const model = agent.model
       ? await Provider.getModel(agent.model.providerID, agent.model.modelID)
@@ -129,7 +132,7 @@ export namespace SessionCompaction {
     // Allow plugins to inject context for compaction
     const compacting = await Plugin.trigger(
       "experimental.session.compacting",
-      { sessionID: input.sessionID },
+      { sessionID: input.sessionID, args: compactionPart?.args },
       { context: [] },
     )
     const result = await processor.process({
@@ -195,6 +198,7 @@ export namespace SessionCompaction {
         modelID: z.string(),
       }),
       auto: z.boolean(),
+      args: z.string().optional(),
     }),
     async (input) => {
       const msg = await Session.updateMessage({
@@ -213,6 +217,7 @@ export namespace SessionCompaction {
         sessionID: msg.sessionID,
         type: "compaction",
         auto: input.auto,
+        args: input.args,
       })
     },
   )
