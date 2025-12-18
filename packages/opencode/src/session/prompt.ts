@@ -562,11 +562,16 @@ export namespace SessionPrompt {
     throw new Error("Impossible")
   })
 
+  async function lastUser(sessionID: string) {
+    for await (const item of MessageV2.stream(sessionID)) {
+      if (item.info.role === "user") return item.info as MessageV2.User
+    }
+  }
+
   async function lastModel(sessionID: string) {
     for await (const item of MessageV2.stream(sessionID)) {
-      if (item.info.role === "user" && item.info.model) return item.info.model
+      if (item.info.role === "user") return item.info.model
     }
-    return Provider.defaultModel()
   }
 
   async function resolveTools(input: {
@@ -725,7 +730,7 @@ export namespace SessionPrompt {
       },
       tools: input.tools,
       agent: agent.name,
-      model: input.model ?? agent.model ?? (await lastModel(input.sessionID)),
+      model: input.model ?? (await lastModel(input.sessionID)) ?? agent.model ?? (await Provider.defaultModel()),
       system: input.system,
     }
 
@@ -1053,7 +1058,7 @@ export namespace SessionPrompt {
       SessionRevert.cleanup(session)
     }
     const agent = await Agent.get(input.agent)
-    const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
+    const model = input.model ?? (await lastModel(input.sessionID)) ?? agent.model ?? (await Provider.defaultModel())
     const userMsg: MessageV2.User = {
       id: Identifier.ascending("message"),
       sessionID: input.sessionID,
