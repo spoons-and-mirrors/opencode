@@ -1325,6 +1325,7 @@ export namespace SessionPrompt {
     }
     template = template.trim()
 
+    const sessionModel = await lastModel(input.sessionID)
     const model = await (async () => {
       if (command.model) {
         return Provider.parseModel(command.model)
@@ -1336,11 +1337,11 @@ export namespace SessionPrompt {
         }
       }
       if (input.model) return Provider.parseModel(input.model)
-      return await lastModel(input.sessionID)
+      return sessionModel
     })()
     const agent = await Agent.get(agentName)
     const parentAgent = input.agent ?? "build"
-    const parentModel = input.model ? Provider.parseModel(input.model) : await lastModel(input.sessionID)
+    const parentModel = input.model ? Provider.parseModel(input.model) : sessionModel
 
     const parts =
       (agent.mode === "subagent" && command.subtask !== false) || command.subtask === true
