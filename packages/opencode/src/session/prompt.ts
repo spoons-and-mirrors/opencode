@@ -419,6 +419,15 @@ export namespace SessionPrompt {
         // Add synthetic user message to prevent certain reasoning models from erroring
         // If we create assistant messages w/ out user ones following mid loop thinking signatures
         // will be missing and it can cause errors for models like gemini for example
+        const parentAgent = (() => {
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            const msg = msgs[i]
+            if (msg.info.role === "user" && !msg.parts.some((p) => p.type === "subtask")) {
+              return msg.info.agent
+            }
+          }
+          return "build"
+        })()
         const summaryUserMsg: MessageV2.User = {
           id: Identifier.ascending("message"),
           sessionID,
@@ -426,8 +435,8 @@ export namespace SessionPrompt {
           time: {
             created: Date.now(),
           },
-          agent: lastUser.agent,
-          model: lastUser.model,
+          agent: parentAgent,
+          model: task.parentModel ?? lastUser.model,
         }
         await Session.updateMessage(summaryUserMsg)
         await Session.updatePart({
@@ -1334,6 +1343,7 @@ export namespace SessionPrompt {
       return await lastModel(input.sessionID)
     })()
     const agent = await Agent.get(agentName)
+    const parentModel = input.model ? Provider.parseModel(input.model) : await lastModel(input.sessionID)
 
     const parts =
       (agent.mode === "subagent" && command.subtask !== false) || command.subtask === true
@@ -1343,6 +1353,7 @@ export namespace SessionPrompt {
               agent: agent.name,
               description: command.description ?? "",
               command: input.command,
+              parentModel,
               // TODO: how can we make task tool accept a more complex input?
               prompt: await resolvePromptParts(template).then((x) => x.find((y) => y.type === "text")?.text ?? ""),
             },
