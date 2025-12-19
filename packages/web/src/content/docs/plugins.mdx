@@ -251,8 +251,10 @@ const HelloCommand: Plugin = async () => ({
       sessionOnly: true,
       async execute({ sessionID, arguments: args, client }) {
         await client.session.prompt({
-          sessionID: sessionID!,
-          parts: [{ type: "text", text: `Hello from command! Args: ${args}` }],
+          path: { id: sessionID! },
+          body: {
+            parts: [{ type: "text", text: `Hello from command! Args: ${args}` }],
+          },
         })
       },
     },
@@ -295,3 +297,30 @@ The `plugin.command` hook lets you define commands that appear in command listin
 - `execute`: Function that runs when the command is invoked, receives `{ sessionID, arguments, client }`
 
 Commands are invoked by typing `/command-name` in the TUI.
+
+---
+
+### Show toast notifications
+
+Commands can display toast notifications using the SDK client:
+
+```ts title=".opencode/command/notify.ts"
+export default async () => ({
+  "plugin.command": {
+    notify: {
+      description: "Show a notification",
+      async execute({ arguments: args, client }) {
+        await client.tui.showToast({
+          body: {
+            title: "Notification",
+            message: args || "Hello from plugin!",
+            variant: "success",
+          },
+        })
+      },
+    },
+  },
+})
+```
+
+Available toast variants: `success`, `error`, `warning`.
