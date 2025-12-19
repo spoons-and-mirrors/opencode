@@ -1285,8 +1285,8 @@ export namespace SessionPrompt {
     const command = await Command.get(input.command)
     if (!command) return
 
-    // Plugin commands have empty templates - execute them directly
-    if (command.template === "") {
+    // Plugin commands execute directly
+    if (command.type === "plugin") {
       const plugins = await Plugin.list()
       for (const plugin of plugins) {
         const pluginCommands = plugin["plugin.command"]
@@ -1295,7 +1295,11 @@ export namespace SessionPrompt {
 
         const client = await Plugin.client()
         try {
-          await pluginCommand.execute({ sessionID: input.sessionID, client })
+          await pluginCommand.execute({
+            sessionID: input.sessionID,
+            arguments: input.arguments,
+            client,
+          })
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           log.error("plugin command failed", {
@@ -1309,7 +1313,10 @@ export namespace SessionPrompt {
           })
           throw error
         }
-        const last = await Session.messages({ sessionID: input.sessionID, limit: 1 })
+        const last = await Session.messages({
+          sessionID: input.sessionID,
+          limit: 1,
+        })
         return last.at(0)
       }
       return

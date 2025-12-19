@@ -208,7 +208,11 @@ export interface Hooks {
       description: string
       aliases?: string[]
       sessionOnly?: boolean
-      execute(input: { sessionID?: string; client: ReturnType<typeof createOpencodeClient> }): Promise<void>
+      execute(input: {
+        sessionID?: string
+        arguments: string
+        client: ReturnType<typeof createOpencodeClient>
+      }): Promise<void>
     }
   }
 }

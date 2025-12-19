@@ -28,6 +28,7 @@ export namespace Command {
       agent: z.string().optional(),
       model: z.string().optional(),
       template: z.string(),
+      type: z.enum(["template", "plugin"]),
       subtask: z.boolean().optional(),
       sessionOnly: z.boolean().optional(),
       aliases: z.array(z.string()).optional(),
@@ -48,11 +49,13 @@ export namespace Command {
     const result: Record<string, Info> = {
       [Default.INIT]: {
         name: Default.INIT,
+        type: "template",
         description: "create/update AGENTS.md",
         template: PROMPT_INITIALIZE.replace("${path}", Instance.worktree),
       },
       [Default.REVIEW]: {
         name: Default.REVIEW,
+        type: "template",
         description: "review changes [commit|branch|pr], defaults to uncommitted",
         template: PROMPT_REVIEW.replace("${path}", Instance.worktree),
         subtask: true,
@@ -62,6 +65,7 @@ export namespace Command {
     for (const [name, command] of Object.entries(cfg.command ?? {})) {
       result[name] = {
         name,
+        type: "template",
         agent: command.agent,
         model: command.model,
         description: command.description,
@@ -78,6 +82,7 @@ export namespace Command {
         if (result[name]) continue
         result[name] = {
           name,
+          type: "plugin",
           description: cmd.description,
           template: "",
           sessionOnly: cmd.sessionOnly,

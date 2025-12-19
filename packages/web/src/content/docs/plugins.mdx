@@ -249,10 +249,10 @@ const HelloCommand: Plugin = async () => ({
       description: "Say hello",
       aliases: ["hi"],
       sessionOnly: true,
-      async execute({ sessionID, client }) {
+      async execute({ sessionID, arguments: args, client }) {
         await client.session.prompt({
           sessionID: sessionID!,
-          parts: [{ type: "text", text: "Hello from command!" }],
+          parts: [{ type: "text", text: `Hello from command! Args: ${args}` }],
         })
       },
     },
@@ -272,13 +272,13 @@ export const CommandsPlugin: Plugin = async (ctx) => {
     "plugin.command": {
       foo: {
         description: "Do foo",
-        async execute({ sessionID, client }) {
+        async execute({ sessionID, arguments: args, client }) {
           // ...
         },
       },
       bar: {
         description: "Do bar",
-        async execute({ sessionID, client }) {
+        async execute({ sessionID, arguments: args, client }) {
           // ...
         },
       },
@@ -292,6 +292,6 @@ The `plugin.command` hook lets you define commands that appear in command listin
 - `description`: Brief description shown in autocomplete
 - `aliases`: Alternative names for the command (optional)
 - `sessionOnly`: Whether command requires an active session (optional)
-- `execute`: Function that runs when the command is invoked
+- `execute`: Function that runs when the command is invoked, receives `{ sessionID, arguments, client }`
 
 Commands are invoked by typing `/command-name` in the TUI.
