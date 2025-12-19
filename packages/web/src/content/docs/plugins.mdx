@@ -238,7 +238,31 @@ The `experimental.session.compacting` hook fires before the LLM generates a cont
 
 ### Slash commands
 
-Register custom slash commands that users can execute from the TUI:
+Register custom slash commands that users can execute from the TUI. You can place `.ts` files directly in the `command/` folder:
+
+```ts title=".opencode/command/hello.ts"
+import type { Plugin } from "@opencode-ai/plugin"
+
+const HelloCommand: Plugin = async () => ({
+  "plugin.command": {
+    hello: {
+      description: "Say hello",
+      aliases: ["hi"],
+      sessionOnly: true,
+      async execute({ sessionID, client }) {
+        await client.session.prompt({
+          sessionID: sessionID!,
+          parts: [{ type: "text", text: "Hello from command!" }],
+        })
+      },
+    },
+  },
+})
+
+export default HelloCommand
+```
+
+You can also register multiple commands from a single plugin file in `.opencode/plugin/`:
 
 ```ts title=".opencode/plugin/commands.ts"
 import type { Plugin } from "@opencode-ai/plugin"
@@ -246,15 +270,16 @@ import type { Plugin } from "@opencode-ai/plugin"
 export const CommandsPlugin: Plugin = async (ctx) => {
   return {
     "plugin.command": {
-      hello: {
-        description: "Say hello",
-        aliases: ["hi"],
-        sessionOnly: true,
+      foo: {
+        description: "Do foo",
         async execute({ sessionID, client }) {
-          await client.session.prompt({
-            sessionID: sessionID!,
-            parts: [{ type: "text", text: "Hello from plugin command!" }],
-          })
+          // ...
+        },
+      },
+      bar: {
+        description: "Do bar",
+        async execute({ sessionID, client }) {
+          // ...
         },
       },
     },

@@ -295,7 +295,7 @@ export namespace Config {
     return result
   }
 
-  const PLUGIN_GLOB = new Bun.Glob("plugin/*.{ts,js}")
+  const PLUGIN_GLOB = new Bun.Glob("{plugin,command}/*.{ts,js}")
   async function loadPlugin(dir: string) {
     const plugins: string[] = []
 
