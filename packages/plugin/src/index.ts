@@ -142,9 +142,57 @@ export type AuthOuathResult = { url: string; instructions: string } & (
     }
 )
 
+export type PluginUINode =
+  | { type: "text"; content: string; fg?: string; bold?: boolean }
+  | {
+      type: "box"
+      direction?: "row" | "column"
+      gap?: number
+      bg?: string
+      border?: ("top" | "bottom" | "left" | "right")[]
+      borderStyle?: "single" | "double" | "heavy" | "rounded"
+      borderColor?: string
+      paddingX?: number
+      paddingY?: number
+      justifyContent?: "flex-start" | "flex-end" | "center" | "space-between"
+      alignSelf?: "flex-start" | "flex-end" | "center"
+      minWidth?: number
+      children: PluginUINode[]
+    }
+  | {
+      type: "checklist"
+      items: Array<{ id: string; label: string; checked?: boolean }> | string
+      fg?: string
+      fgChecked?: string
+      bg?: string
+      bgChecked?: string
+      borderColorChecked?: string
+      onToggle?: string
+    }
+  | {
+      type: "confirm-button"
+      label: string
+      fg?: string
+      bg?: string
+      onConfirm?: string
+    }
+
+export type PluginUIComponent = {
+  name: string
+  template: PluginUINode
+}
+
+export type PluginUIEvent = {
+  component: string
+  event: string
+  data: Record<string, any>
+}
+
 export interface Hooks {
   event?: (input: { event: Event }) => Promise<void>
   config?: (input: Config) => Promise<void>
+  ui?: PluginUIComponent[]
+  "ui.event"?: (input: PluginUIEvent) => Promise<void>
   tool?: {
     [key: string]: ToolDefinition
   }

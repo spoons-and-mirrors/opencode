@@ -39,6 +39,7 @@ import { Todo } from "../session/todo"
 import { InstanceBootstrap } from "../project/bootstrap"
 import { MCP } from "../mcp"
 import { Storage } from "../storage/storage"
+import { Plugin } from "../plugin"
 import type { ContentfulStatusCode } from "hono/utils/http-status"
 import { TuiEvent } from "@/cli/cmd/tui/event"
 import { Snapshot } from "@/snapshot"
@@ -218,6 +219,48 @@ export namespace Server {
       .use(validator("query", z.object({ directory: z.string().optional() })))
 
       .route("/project", ProjectRoute)
+
+      .get(
+        "/plugins/ui",
+        describeRoute({
+          summary: "List plugin UI components",
+          description: "Get a list of all registered plugin UI components with their templates.",
+          operationId: "plugins.ui",
+          responses: {
+            200: {
+              description: "Plugin UI components",
+              content: {
+                "application/json": {
+                  schema: resolver(z.array(z.any())),
+                },
+              },
+            },
+          },
+        }),
+        async () => {
+          const components = await Plugin.listUIComponents()
+          return Response.json(components)
+        },
+      )
+
+      .post(
+        "/plugins/ui/event",
+        describeRoute({
+          summary: "Send UI event to plugin",
+          description: "Send an event from a plugin UI component back to the plugin.",
+          operationId: "plugins.ui.event",
+          responses: {
+            200: {
+              description: "Event received",
+            },
+          },
+        }),
+        async (c) => {
+          const body = await c.req.json()
+          await Plugin.triggerUIEvent(body)
+          return c.json({ ok: true })
+        },
+      )
 
       .get(
         "/pty",

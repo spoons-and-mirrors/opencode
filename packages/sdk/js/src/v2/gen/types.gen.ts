@@ -191,6 +191,7 @@ export type TextPart = {
   text: string
   synthetic?: boolean
   ignored?: boolean
+  plugin?: boolean
   time?: {
     start: number
     end?: number
@@ -1566,6 +1567,7 @@ export type TextPartInput = {
   text: string
   synthetic?: boolean
   ignored?: boolean
+  plugin?: boolean
   time?: {
     start: number
     end?: number
@@ -1950,6 +1952,24 @@ export type ProjectUpdateResponses = {
 }
 
 export type ProjectUpdateResponse = ProjectUpdateResponses[keyof ProjectUpdateResponses]
+
+export type PluginsUiData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/plugins/ui"
+}
+
+export type PluginsUiResponses = {
+  /**
+   * Plugin UI components
+   */
+  200: Array<unknown>
+}
+
+export type PluginsUiResponse = PluginsUiResponses[keyof PluginsUiResponses]
 
 export type PtyListData = {
   body?: never

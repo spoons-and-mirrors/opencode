@@ -66,6 +66,251 @@ import { Footer } from "./footer.tsx"
 import { usePromptRef } from "../../context/prompt"
 import { Filesystem } from "@/util/filesystem"
 
+// Plugin UI types
+type PluginUINode =
+  | { type: "text"; content: string; fg?: string; bold?: boolean }
+  | {
+      type: "box"
+      direction?: "row" | "column"
+      gap?: number
+      bg?: string
+      border?: ("top" | "bottom" | "left" | "right")[]
+      borderStyle?: "single" | "double" | "heavy" | "rounded"
+      borderColor?: string
+      paddingX?: number
+      paddingY?: number
+      justifyContent?: "flex-start" | "flex-end" | "center" | "space-between"
+      alignSelf?: "flex-start" | "flex-end" | "center"
+      minWidth?: number
+      children: PluginUINode[]
+    }
+  | {
+      type: "checklist"
+      items: Array<{ id: string; label: string; checked?: boolean }> | string
+      fg?: string
+      fgChecked?: string
+      bg?: string
+      bgChecked?: string
+      borderColorChecked?: string
+      onToggle?: string
+    }
+  | {
+      type: "confirm-button"
+      label: string
+      fg?: string
+      bg?: string
+      onConfirm?: string
+    }
+
+type PluginUIComponent = {
+  name: string
+  template: PluginUINode
+}
+
+type PluginUIEventHandler = (event: { component: string; event: string; data: Record<string, any> }) => void
+
+// Plugin UI Registry - stores templates fetched from plugins
+export const PluginRegistry = {
+  templates: new Map<string, PluginUINode>(),
+  baseUrl: "",
+  register(name: string, template: PluginUINode) {
+    this.templates.set(name, template)
+  },
+  get(name: string) {
+    return this.templates.get(name)
+  },
+  async emit(component: string, event: string, data: Record<string, any>) {
+    try {
+      await fetch(`${this.baseUrl}/plugins/ui/event`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ component, event, data }),
+      })
+    } catch (e) {
+      console.error("PluginRegistry.emit error:", e)
+    }
+  },
+  async load(baseUrl: string) {
+    this.baseUrl = baseUrl
+    try {
+      const res = await fetch(`${baseUrl}/plugins/ui`)
+      if (!res.ok) {
+        console.error("PluginRegistry.load failed:", res.status)
+        return
+      }
+      const components: PluginUIComponent[] = await res.json()
+      console.error("PluginRegistry loaded:", components.length, "components")
+      for (const c of components) {
+        console.error("Registering plugin UI:", c.name)
+        this.register(c.name, c.template)
+      }
+    } catch (e) {
+      console.error("PluginRegistry.load error:", e)
+    }
+  },
+}
+
+// Interpolate {{key}} placeholders with metadata values
+function interpolate(text: string, metadata: Record<string, any>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (_, key) => String(metadata[key] ?? ""))
+}
+
+// Render a plugin UI template
+function PluginUIRenderer(props: { node: PluginUINode; metadata: Record<string, any> }) {
+  const { theme } = useTheme()
+  const getColor = (color?: string) => {
+    if (!color) return undefined
+    // Theme color aliases
+    if (color === "primary") return theme.primary
+    if (color === "secondary") return theme.secondary
+    if (color === "accent") return theme.accent
+    if (color === "text") return theme.text
+    if (color === "textMuted") return theme.textMuted
+    if (color === "background") return theme.background
+    if (color === "backgroundPanel") return theme.backgroundPanel
+    if (color === "backgroundElement") return theme.backgroundElement
+    if (color === "border") return theme.border
+    if (color === "borderActive") return theme.borderActive
+    if (color === "borderSubtle") return theme.borderSubtle
+    if (color === "error") return theme.error
+    if (color === "warning") return theme.warning
+    if (color === "success") return theme.success
+    if (color === "info") return theme.info
+    return color // Allow hex colors
+  }
+
+  return (
+    <Switch>
+      <Match when={props.node.type === "text"}>
+        {(() => {
+          const node = props.node as { type: "text"; content: string; fg?: string; bold?: boolean }
+          const content = interpolate(node.content, props.metadata)
+          return <text content={node.bold ? `**${content}**` : content} fg={getColor(node.fg) ?? theme.text} />
+        })()}
+      </Match>
+      <Match when={props.node.type === "box"}>
+        {(() => {
+          const node = props.node as {
+            type: "box"
+            direction?: "row" | "column"
+            gap?: number
+            bg?: string
+            border?: ("top" | "bottom" | "left" | "right")[]
+            borderStyle?: "single" | "double" | "heavy" | "rounded"
+            borderColor?: string
+            paddingX?: number
+            paddingY?: number
+            justifyContent?: "flex-start" | "flex-end" | "center" | "space-between"
+            alignSelf?: "flex-start" | "flex-end" | "center"
+            minWidth?: number
+            children: PluginUINode[]
+          }
+          return (
+            <box
+              flexDirection={node.direction ?? "row"}
+              gap={node.gap ?? 0}
+              backgroundColor={getColor(node.bg)}
+              border={node.border}
+              borderStyle={node.borderStyle}
+              borderColor={getColor(node.borderColor) ?? theme.border}
+              paddingLeft={node.paddingX}
+              paddingRight={node.paddingX}
+              paddingTop={node.paddingY}
+              paddingBottom={node.paddingY}
+              justifyContent={node.justifyContent}
+              alignSelf={node.alignSelf}
+              minWidth={node.minWidth}
+            >
+              <For each={node.children}>{(child) => <PluginUIRenderer node={child} metadata={props.metadata} />}</For>
+            </box>
+          )
+        })()}
+      </Match>
+      <Match when={props.node.type === "checklist"}>
+        {(() => {
+          const node = props.node as {
+            type: "checklist"
+            items: Array<{ id: string; label: string; checked?: boolean }> | string
+            fg?: string
+            fgChecked?: string
+            bg?: string
+            bgChecked?: string
+            borderColorChecked?: string
+            onToggle?: string
+          }
+          // Items can be an array or a "{{key}}" placeholder string to interpolate from metadata
+          const rawItems =
+            typeof node.items === "string" && node.items.startsWith("{{")
+              ? ((props.metadata[node.items.slice(2, -2)] as Array<{ id: string; label: string; checked?: boolean }>) ??
+                [])
+              : (node.items as Array<{ id: string; label: string; checked?: boolean }>)
+          const [items, setItems] = createSignal(rawItems.map((i) => ({ ...i, checked: i.checked ?? true })))
+          return (
+            <box flexDirection="column" gap={0}>
+              <For each={items()}>
+                {(item) => (
+                  <box
+                    flexDirection="row"
+                    backgroundColor={item.checked ? (getColor(node.bgChecked) ?? theme.backgroundElement) : undefined}
+                    border={item.checked ? ["right"] : undefined}
+                    borderStyle={item.checked ? "heavy" : undefined}
+                    borderColor={item.checked ? (getColor(node.borderColorChecked) ?? theme.accent) : undefined}
+                    paddingLeft={1}
+                    paddingRight={1}
+                    onMouseDown={() => {
+                      const updatedItems = items().map((i) => (i.id === item.id ? { ...i, checked: !i.checked } : i))
+                      setItems(updatedItems)
+                      if (node.onToggle && props.metadata._component) {
+                        PluginRegistry.emit(props.metadata._component, node.onToggle, {
+                          id: item.id,
+                          checked: !item.checked,
+                          items: updatedItems,
+                        })
+                      }
+                    }}
+                  >
+                    <text
+                      content={item.label}
+                      fg={
+                        item.checked ? (getColor(node.fgChecked) ?? theme.text) : (getColor(node.fg) ?? theme.textMuted)
+                      }
+                    />
+                  </box>
+                )}
+              </For>
+            </box>
+          )
+        })()}
+      </Match>
+      <Match when={props.node.type === "confirm-button"}>
+        {(() => {
+          const node = props.node as {
+            type: "confirm-button"
+            label: string
+            fg?: string
+            bg?: string
+            onConfirm?: string
+          }
+          return (
+            <box
+              backgroundColor={getColor(node.bg) ?? theme.accent}
+              paddingLeft={2}
+              paddingRight={2}
+              onMouseDown={() => {
+                if (node.onConfirm && props.metadata._component) {
+                  PluginRegistry.emit(props.metadata._component, node.onConfirm, {})
+                }
+              }}
+            >
+              <text content={node.label} fg={getColor(node.fg) ?? theme.background} />
+            </box>
+          )
+        })()}
+      </Match>
+    </Switch>
+  )
+}
+
 addDefaultParsers(parsers.parsers)
 
 class CustomSpeedScroll implements ScrollAcceleration {
@@ -578,7 +823,7 @@ export function Session() {
           if (!parts || !Array.isArray(parts)) continue
 
           const hasValidTextPart = parts.some(
-            (part) => part && part.type === "text" && !part.synthetic && !part.ignored,
+            (part) => part && part.type === "text" && !part.synthetic && !part.ignored && !part.plugin,
           )
 
           if (hasValidTextPart) {
@@ -1001,8 +1246,11 @@ function UserMessage(props: {
 }) {
   const ctx = use()
   const local = useLocal()
-  const text = createMemo(() => props.parts.flatMap((x) => (x.type === "text" && !x.synthetic ? [x] : []))[0])
+  const text = createMemo(
+    () => props.parts.flatMap((x) => (x.type === "text" && !x.synthetic && !x.plugin ? [x] : []))[0],
+  )
   const files = createMemo(() => props.parts.flatMap((x) => (x.type === "file" ? [x] : [])))
+  const pluginParts = createMemo(() => props.parts.flatMap((x) => (x.type === "text" && x.plugin ? [x] : [])))
   const sync = useSync()
   const { theme } = useTheme()
   const [hover, setHover] = createSignal(false)
@@ -1084,6 +1332,20 @@ function UserMessage(props: {
           borderColor={theme.borderActive}
         />
       </Show>
+      <For each={pluginParts()}>
+        {(part, index) => {
+          const componentName = part.text.trim()
+          const metadata = { ...((part as any).metadata ?? {}), _component: componentName }
+          const template = PluginRegistry.get(componentName)
+          return (
+            <Show when={template}>
+              <box id={"plugin-" + part.id} marginTop={index() === 0 ? 1 : 0} flexShrink={0}>
+                <PluginUIRenderer node={template!} metadata={metadata} />
+              </box>
+            </Show>
+          )
+        }}
+      </For>
     </>
   )
 }
@@ -1197,6 +1459,23 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
 function TextPart(props: { last: boolean; part: TextPart; message: AssistantMessage }) {
   const ctx = use()
   const { theme, syntax } = useTheme()
+
+  // Handle plugin parts with custom rendering
+  if ((props.part as any).plugin) {
+    const componentName = props.part.text.trim()
+    const metadata = { ...((props.part as any).metadata ?? {}), _component: componentName }
+    const template = PluginRegistry.get(componentName)
+    return (
+      <Show when={props.part.text.trim()}>
+        <box id={"plugin-" + props.part.id} marginTop={1} flexShrink={0}>
+          <Show when={template} fallback={<text content={`[${componentName}]`} fg={theme.textMuted} />}>
+            <PluginUIRenderer node={template!} metadata={metadata} />
+          </Show>
+        </box>
+      </Show>
+    )
+  }
+
   return (
     <Show when={props.part.text.trim()}>
       <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
@@ -1366,8 +1645,9 @@ function ToolTitle(props: { fallback: string; when: any; icon: string; children:
   const { theme } = useTheme()
   return (
     <text paddingLeft={3} fg={props.when ? theme.textMuted : theme.text}>
-      <Show fallback={<>~ {props.fallback}</>} when={props.when}>
-        <span style={{ bold: true }}>{props.icon}</span> {props.children}
+      <span style={{ fg: theme.textMuted }}>{props.icon} </span>
+      <Show when={props.when} fallback={<span style={{ fg: theme.textMuted }}>{props.fallback}</span>}>
+        {props.children}
       </Show>
     </text>
   )

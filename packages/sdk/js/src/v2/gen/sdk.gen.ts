@@ -50,6 +50,7 @@ import type {
   PathGetResponses,
   PermissionRespondErrors,
   PermissionRespondResponses,
+  PluginsUiResponses,
   ProjectCurrentResponses,
   ProjectListResponses,
   ProjectUpdateErrors,
@@ -286,6 +287,27 @@ export class Project extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
+    })
+  }
+}
+
+export class Plugins extends HeyApiClient {
+  /**
+   * List plugin UI components
+   *
+   * Get a list of all registered plugin UI components with their templates.
+   */
+  public ui<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<PluginsUiResponses, unknown, ThrowOnError>({
+      url: "/plugins/ui",
+      ...options,
+      ...params,
     })
   }
 }
@@ -2573,6 +2595,8 @@ export class OpencodeClient extends HeyApiClient {
   global = new Global({ client: this.client })
 
   project = new Project({ client: this.client })
+
+  plugins = new Plugins({ client: this.client })
 
   pty = new Pty({ client: this.client })
 

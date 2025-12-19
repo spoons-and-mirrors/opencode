@@ -304,7 +304,11 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
   return (
     <Show when={displayText()}>
       <div data-component="text-part">
-        <Markdown text={displayText()} />
+        <Switch fallback={<Markdown text={displayText()} />}>
+          <Match when={part.plugin}>
+            <Dynamic component={part.text} {...(part.metadata ?? {})} />
+          </Match>
+        </Switch>
       </div>
     </Show>
   )

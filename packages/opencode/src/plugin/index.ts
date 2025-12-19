@@ -53,9 +53,9 @@ export namespace Plugin {
   })
 
   export async function trigger<
-    Name extends Exclude<keyof Required<Hooks>, "auth" | "event" | "tool">,
-    Input = Parameters<Required<Hooks>[Name]>[0],
-    Output = Parameters<Required<Hooks>[Name]>[1],
+    Name extends Exclude<keyof Required<Hooks>, "auth" | "event" | "tool" | "ui">,
+    Input = Parameters<Extract<Required<Hooks>[Name], (...args: any) => any>>[0],
+    Output = Parameters<Extract<Required<Hooks>[Name], (...args: any) => any>>[1],
   >(name: Name, input: Input, output: Output): Promise<Output> {
     if (!name) return output
     for (const hook of await state().then((x) => x.hooks)) {
@@ -71,6 +71,18 @@ export namespace Plugin {
 
   export async function list() {
     return state().then((x) => x.hooks)
+  }
+
+  export async function listUIComponents() {
+    const hooks = await list()
+    return hooks.flatMap((h) => h.ui ?? [])
+  }
+
+  export async function triggerUIEvent(event: { component: string; event: string; data: Record<string, any> }) {
+    const hooks = await list()
+    for (const hook of hooks) {
+      await hook["ui.event"]?.(event)
+    }
   }
 
   export async function init() {

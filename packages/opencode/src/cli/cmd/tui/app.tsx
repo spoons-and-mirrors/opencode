@@ -99,6 +99,11 @@ export function tui(input: { url: string; args: Args; onExit?: () => Promise<voi
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
     const mode = await getTerminalBackgroundColor()
+
+    // Load plugin UI components
+    const { PluginRegistry } = await import("./routes/session/index.tsx")
+    await PluginRegistry.load(input.url)
+
     const onExit = async () => {
       await input.onExit?.()
       resolve()

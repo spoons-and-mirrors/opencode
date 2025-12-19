@@ -11,6 +11,7 @@ import { Code } from "@opencode-ai/ui/code"
 import { GlobalSyncProvider } from "@/context/global-sync"
 import { LayoutProvider } from "@/context/layout"
 import { GlobalSDKProvider } from "@/context/global-sdk"
+import { createEffect } from "solid-js"
 import { TerminalProvider } from "@/context/terminal"
 import { PromptProvider } from "@/context/prompt"
 import { NotificationProvider } from "@/context/notification"
@@ -37,6 +38,19 @@ const url =
     : "/")
 
 export function App() {
+  createEffect(() => {
+    fetch(`${url}/plugins/ui`)
+      .then((r) => r.json())
+      .then((components: Array<{ name: string; url: string }>) => {
+        for (const comp of components) {
+          if (customElements.get(comp.name)) continue
+          const script = document.createElement("script")
+          script.src = `${url}${comp.url}`
+          script.type = "module"
+          document.head.appendChild(script)
+        }
+      })
+  })
   return (
     <MetaProvider>
       <Font />
