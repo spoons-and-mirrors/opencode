@@ -79,6 +79,8 @@ type PluginUINode =
       borderColor?: string
       paddingX?: number
       paddingY?: number
+      paddingTop?: number
+      paddingBottom?: number
       justifyContent?: "flex-start" | "flex-end" | "center" | "space-between"
       alignSelf?: "flex-start" | "flex-end" | "center"
       minWidth?: number
@@ -99,7 +101,15 @@ type PluginUINode =
       label: string
       fg?: string
       bg?: string
+      fgHover?: string
+      borderColorHover?: string
       onConfirm?: string
+    }
+  | {
+      type: "button-group"
+      gap?: number
+      defaultIndex?: number
+      children: PluginUINode[]
     }
 
 type PluginUIComponent = {
@@ -185,7 +195,7 @@ function PluginUIRenderer(props: { node: PluginUINode; metadata: Record<string, 
         {(() => {
           const node = props.node as { type: "text"; content: string; fg?: string; bold?: boolean }
           const content = interpolate(node.content, props.metadata)
-          return <text content={node.bold ? `**${content}**` : content} fg={getColor(node.fg) ?? theme.text} />
+          return <text fg={getColor(node.fg) ?? theme.text}>{node.bold ? <strong>{content}</strong> : content}</text>
         })()}
       </Match>
       <Match when={props.node.type === "box"}>
@@ -200,6 +210,8 @@ function PluginUIRenderer(props: { node: PluginUINode; metadata: Record<string, 
             borderColor?: string
             paddingX?: number
             paddingY?: number
+            paddingTop?: number
+            paddingBottom?: number
             justifyContent?: "flex-start" | "flex-end" | "center" | "space-between"
             alignSelf?: "flex-start" | "flex-end" | "center"
             minWidth?: number
@@ -211,12 +223,12 @@ function PluginUIRenderer(props: { node: PluginUINode; metadata: Record<string, 
               gap={node.gap ?? 0}
               backgroundColor={getColor(node.bg)}
               border={node.border}
-              borderStyle={node.borderStyle}
-              borderColor={getColor(node.borderColor) ?? theme.border}
+              borderStyle={node.border ? node.borderStyle : undefined}
+              borderColor={node.border ? (getColor(node.borderColor) ?? theme.border) : undefined}
               paddingLeft={node.paddingX}
               paddingRight={node.paddingX}
-              paddingTop={node.paddingY}
-              paddingBottom={node.paddingY}
+              paddingTop={node.paddingTop ?? node.paddingY}
+              paddingBottom={node.paddingBottom ?? node.paddingY}
               justifyContent={node.justifyContent}
               alignSelf={node.alignSelf}
               minWidth={node.minWidth}
@@ -289,20 +301,117 @@ function PluginUIRenderer(props: { node: PluginUINode; metadata: Record<string, 
             label: string
             fg?: string
             bg?: string
+            fgHover?: string
+            borderColorHover?: string
             onConfirm?: string
           }
+          const [hovered, setHovered] = createSignal(false)
           return (
             <box
               backgroundColor={getColor(node.bg) ?? theme.accent}
               paddingLeft={2}
               paddingRight={2}
+              border={hovered() ? ["left"] : undefined}
+              borderStyle={hovered() ? "heavy" : undefined}
+              borderColor={hovered() ? (getColor(node.borderColorHover) ?? theme.warning) : undefined}
+              onMouseOver={() => setHovered(true)}
+              onMouseOut={() => setHovered(false)}
               onMouseDown={() => {
                 if (node.onConfirm && props.metadata._component) {
                   PluginRegistry.emit(props.metadata._component, node.onConfirm, {})
                 }
               }}
             >
-              <text content={node.label} fg={getColor(node.fg) ?? theme.background} />
+              <text
+                content={node.label}
+                fg={hovered() ? (getColor(node.fgHover) ?? theme.warning) : (getColor(node.fg) ?? theme.background)}
+              />
+            </box>
+          )
+        })()}
+      </Match>
+      <Match when={props.node.type === "button-group"}>
+        {(() => {
+          const node = props.node as {
+            type: "button-group"
+            gap?: number
+            defaultIndex?: number
+            children: PluginUINode[]
+          }
+          const [focusedIndex, setFocusedIndex] = createSignal(node.defaultIndex ?? node.children.length - 1)
+          const [clickedIndex, setClickedIndex] = createSignal<number | null>(null)
+
+          useKeyboard((evt) => {
+            if (clickedIndex() !== null) return false
+            if (evt.name === "left" || evt.name === "h") {
+              setFocusedIndex((i) => Math.max(0, i - 1))
+              return true
+            }
+            if (evt.name === "right" || evt.name === "l") {
+              setFocusedIndex((i) => Math.min(node.children.length - 1, i + 1))
+              return true
+            }
+            if (evt.name === "return") {
+              const child = node.children[focusedIndex()] as any
+              if (child?.onConfirm && props.metadata._component) {
+                setClickedIndex(focusedIndex())
+                PluginRegistry.emit(props.metadata._component, child.onConfirm, {})
+              }
+              return true
+            }
+            return false
+          })
+
+          return (
+            <box flexDirection="row" gap={node.gap ?? 2}>
+              <For each={node.children}>
+                {(child, index) => {
+                  const btn = child as {
+                    type: "confirm-button"
+                    label: string
+                    fg?: string
+                    bg?: string
+                    fgHover?: string
+                    borderColorHover?: string
+                    onConfirm?: string
+                  }
+                  const isActive = () => {
+                    if (clickedIndex() !== null) return clickedIndex() === index()
+                    return focusedIndex() === index()
+                  }
+                  return (
+                    <box flexDirection="row">
+                      <box minWidth={1}>
+                        <text content={isActive() ? "┃" : " "} fg={getColor(btn.borderColorHover) ?? theme.warning} />
+                      </box>
+                      <box
+                        backgroundColor={getColor(btn.bg) ?? theme.accent}
+                        paddingLeft={1}
+                        paddingRight={2}
+                        onMouseOver={() => {
+                          if (clickedIndex() === null) setFocusedIndex(index())
+                        }}
+                        onMouseDown={() => {
+                          if (clickedIndex() !== null) return
+                          if (btn.onConfirm && props.metadata._component) {
+                            setClickedIndex(index())
+                            PluginRegistry.emit(props.metadata._component, btn.onConfirm, {})
+                          }
+                        }}
+                      >
+                        <text
+                          content={btn.label}
+                          fg={
+                            isActive()
+                              ? (getColor(btn.fgHover) ?? theme.warning)
+                              : (getColor(btn.fg) ?? theme.background)
+                          }
+                        />
+                      </box>
+                    </box>
+                  )
+                }}
+              </For>
             </box>
           )
         })()}
