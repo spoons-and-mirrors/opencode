@@ -63,6 +63,7 @@ export namespace MessageV2 {
     text: z.string(),
     synthetic: z.boolean().optional(),
     ignored: z.boolean().optional(),
+    plugin: z.boolean().optional(),
     time: z
       .object({
         start: z.number(),
@@ -431,7 +432,7 @@ export namespace MessageV2 {
         }
         result.push(userMessage)
         for (const part of msg.parts) {
-          if (part.type === "text" && !part.ignored)
+          if (part.type === "text" && !part.ignored && !part.plugin)
             userMessage.parts.push({
               type: "text",
               text: part.text,

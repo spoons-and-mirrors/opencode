@@ -18,6 +18,7 @@ import { DialogThemeList } from "@tui/component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { CommandProvider, useCommandDialog } from "@tui/component/dialog-command"
 import { DialogAgent } from "@tui/component/dialog-agent"
+import { pluginModalRequest, setPluginModalRequest, PluginUIRenderer } from "@tui/plugin-ui"
 import { DialogSessionList } from "@tui/component/dialog-session-list"
 import { KeybindProvider } from "@tui/context/keybind"
 import { ThemeProvider, useTheme } from "@tui/context/theme"
@@ -33,6 +34,7 @@ import { KVProvider, useKV } from "./context/kv"
 import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
+import { PluginRegistry } from "./plugin-ui.tsx"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
@@ -99,6 +101,8 @@ export function tui(input: { url: string; args: Args; onExit?: () => Promise<voi
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
     const mode = await getTerminalBackgroundColor()
+    await PluginRegistry.load(input.url)
+
     const onExit = async () => {
       await input.onExit?.()
       resolve()
@@ -205,6 +209,19 @@ function App() {
   })
 
   const args = useArgs()
+
+  createEffect(() => {
+    const request = pluginModalRequest()
+    if (request) {
+      dialog.replace(
+        <box flexDirection="column" paddingLeft={2} paddingRight={2} paddingBottom={1}>
+          <PluginUIRenderer node={request.node} metadata={request.metadata} />
+        </box>,
+      )
+      setPluginModalRequest(null)
+    }
+  })
+
   onMount(() => {
     batch(() => {
       if (args.agent) local.agent.set(args.agent)

@@ -260,3 +260,249 @@ Format as a structured prompt that a new agent can use to resume work.
 ```
 
 When `output.prompt` is set, it completely replaces the default compaction prompt. The `output.context` array is ignored in this case.
+
+---
+
+## UI Components
+
+Plugins can render custom UI components in the TUI. Components are declarative templates that opencode renders natively, with full support for keyboard navigation, mouse events, and theming.
+
+---
+
+### Capabilities
+
+Plugin UI components support:
+
+- **Layout**: Flexible boxes with row/column direction, padding, gaps, and alignment
+- **Text**: Styled text with theme colors and bold formatting
+- **Checklist**: Interactive lists with keyboard (↑/↓/Space) and mouse support
+- **Buttons**: Clickable buttons with shortcuts, hover states, and modal triggers
+- **Collapsible**: Expandable/collapsible sections for progressive disclosure
+- **Modals**: Full-screen dialogs triggered by buttons
+- **Input replacement**: Components can temporarily replace the input area
+
+---
+
+### Defining components
+
+Define UI components in the `ui` hook of your plugin:
+
+```ts title=".opencode/plugin/my-plugin.ts"
+import type { Plugin } from "@opencode-ai/plugin"
+
+export const MyPlugin: Plugin = async (ctx) => {
+  return {
+    ui: [
+      {
+        name: "my-status",
+        template: {
+          type: "box",
+          direction: "row",
+          gap: 1,
+          children: [
+            { type: "text", content: "●", fg: "success" },
+            { type: "text", content: "{{message}}", fg: "text" },
+          ],
+        },
+      },
+    ],
+  }
+}
+```
+
+Components use `{{placeholder}}` syntax for dynamic values passed via metadata.
+
+---
+
+### Component options
+
+| Option         | Description                                    |
+| -------------- | ---------------------------------------------- |
+| `name`         | Unique identifier for the component            |
+| `template`     | The UI node tree to render                     |
+| `replaceInput` | When `true`, component replaces the input area |
+
+---
+
+### Rendering components
+
+Send a component to the chat by including a plugin part in a message:
+
+```ts
+await client.session.prompt({
+  path: { id: sessionId },
+  body: {
+    noReply: true,
+    parts: [
+      {
+        type: "text",
+        text: "my-status",
+        plugin: true,
+        metadata: {
+          message: "Build complete",
+        },
+      },
+    ],
+  },
+})
+```
+
+---
+
+### Node types
+
+#### Text
+
+Display styled text with theme colors.
+
+```ts
+{
+  type: "text",
+  content: "Hello {{name}}",
+  fg: "text",       // Theme color or hex
+  bold: true
+}
+```
+
+#### Box
+
+Container for layout with flexbox properties.
+
+```ts
+{
+  type: "box",
+  direction: "column",  // "row" | "column"
+  gap: 1,
+  paddingX: 2,
+  paddingY: 1,
+  justifyContent: "space-between",
+  bg: "backgroundPanel",
+  children: [...]
+}
+```
+
+#### Checklist
+
+Interactive list with keyboard and mouse support.
+
+```ts
+{
+  type: "checklist",
+  items: "items",  // Metadata key or inline array
+  fgChecked: "text",
+  fg: "textMuted",
+  bgChecked: "backgroundElement",
+  onToggle: "item-toggled"
+}
+```
+
+Users can navigate with ↑/↓ arrows and toggle with Space.
+
+#### Button
+
+Clickable button with optional keyboard shortcut and modal trigger.
+
+```ts
+{
+  type: "button",
+  label: "Confirm",
+  shortcut: "c",           // Optional keyboard shortcut
+  fg: "textMuted",
+  bg: "backgroundPanel",   // Omit for text-only button
+  fgHover: "warning",
+  borderColorHover: "warning",
+  onPress: "confirm"       // Event to emit on click
+}
+```
+
+Buttons with `bg` render with a background and left border indicator. Without `bg`, they render as clickable text.
+
+#### Collapsible
+
+Expandable section for hiding details.
+
+```ts
+{
+  type: "collapsible",
+  title: "{{count}} items",
+  expanded: false,
+  icon: "▶",
+  iconExpanded: "▼",
+  fg: "textMuted",
+  fgExpanded: "text",
+  children: [...]
+}
+```
+
+---
+
+### Modals
+
+Buttons can trigger modals by providing an inline `onModal` node:
+
+```ts
+{
+  type: "button",
+  label: "⚙",
+  fg: "textMuted",
+  fgHover: "warning",
+  onModal: {
+    type: "box",
+    direction: "column",
+    children: [
+      { type: "text", content: "Settings", bold: true },
+      { type: "text", content: "Configure options here", fg: "textMuted" },
+    ],
+  },
+}
+```
+
+Modals render with a dimmed overlay. Press Escape to close.
+
+---
+
+### Handling events
+
+Listen for component events using the `ui.event` hook:
+
+```ts
+export const MyPlugin: Plugin = async (ctx) => {
+  return {
+    "ui.event": async ({ component, event, data }) => {
+      if (component === "my-component") {
+        if (event === "confirm") {
+          // Handle confirmation
+        }
+        if (event === "item-toggled") {
+          console.log("Toggled:", data.id, data.checked)
+        }
+      }
+    },
+    ui: [...],
+  }
+}
+```
+
+Events include the component name, event name, and any associated data.
+
+---
+
+### Theme colors
+
+Components use theme color aliases that adapt to the user's theme:
+
+| Alias               | Description                    |
+| ------------------- | ------------------------------ |
+| `text`              | Primary text color             |
+| `textMuted`         | Secondary/dimmed text          |
+| `background`        | Main background                |
+| `backgroundPanel`   | Panel background               |
+| `backgroundElement` | Interactive element background |
+| `border`            | Default border color           |
+| `borderActive`      | Active/focused border          |
+| `accent`            | Accent color                   |
+| `warning`           | Warning/highlight color        |
+| `success`           | Success indicator              |
+| `error`             | Error indicator                |
+
+You can also use hex colors directly: `"#ff5500"`.

@@ -17,6 +17,109 @@ import { type ToolDefinition } from "./tool"
 
 export * from "./tool"
 
+/**
+ * Text node - displays styled text (non-interactive)
+ */
+export type TextNode = {
+  type: "text"
+  content: string
+  fg?: string
+  bold?: boolean
+}
+
+/**
+ * Box node - layout container with flex properties
+ */
+export type BoxNode = {
+  type: "box"
+  direction?: "row" | "column"
+  gap?: number
+  bg?: string
+  border?: ("top" | "bottom" | "left" | "right")[]
+  borderStyle?: "single" | "double" | "heavy" | "rounded"
+  borderColor?: string
+  marginX?: number
+  marginY?: number
+  marginTop?: number
+  marginBottom?: number
+  marginLeft?: number
+  marginRight?: number
+  paddingX?: number
+  paddingY?: number
+  paddingTop?: number
+  paddingBottom?: number
+  paddingLeft?: number
+  paddingRight?: number
+  justifyContent?: "flex-start" | "flex-end" | "center" | "space-between"
+  alignSelf?: "flex-start" | "flex-end" | "center"
+  minWidth?: number
+  children: PluginUINode[]
+}
+
+/**
+ * Checklist node - interactive toggleable list
+ *
+ * Keyboard: ↑/↓/j/k to navigate, Space to toggle
+ * Mouse: Click to toggle
+ */
+export type ChecklistNode = {
+  type: "checklist"
+  items: Array<{ id: string; label: string; checked?: boolean }> | string
+  fg?: string
+  fgChecked?: string
+  bgChecked?: string
+  borderColorChecked?: string
+  onToggle?: string
+}
+
+/**
+ * Button node - clickable button
+ *
+ * Keyboard: Press shortcut key to activate (if defined)
+ * Mouse: Click to activate
+ */
+export type ButtonNode = {
+  type: "button"
+  label: string
+  shortcut?: string
+  fg?: string
+  bg?: string
+  fgHover?: string
+  borderColorHover?: string
+  onPress?: string
+  onModal?: PluginUINode
+}
+
+/**
+ * Collapsible node - expandable/collapsible section
+ *
+ * Mouse: Click to toggle
+ */
+export type CollapsibleNode = {
+  type: "collapsible"
+  title: string
+  expanded?: boolean
+  fg?: string
+  fgExpanded?: string
+  icon?: string
+  iconExpanded?: string
+  children: PluginUINode[]
+}
+
+export type PluginUINode = TextNode | BoxNode | ChecklistNode | ButtonNode | CollapsibleNode
+
+export type PluginUIComponent = {
+  name: string
+  template: PluginUINode
+  replaceInput?: boolean
+}
+
+export type PluginUIEvent = {
+  component: string
+  event: string
+  data: Record<string, any>
+}
+
 export type ProviderContext = {
   source: "env" | "config" | "custom" | "api"
   info: Provider
@@ -145,6 +248,8 @@ export type AuthOuathResult = { url: string; instructions: string } & (
 export interface Hooks {
   event?: (input: { event: Event }) => Promise<void>
   config?: (input: Config) => Promise<void>
+  ui?: PluginUIComponent[]
+  "ui.event"?: (input: PluginUIEvent) => Promise<void>
   tool?: {
     [key: string]: ToolDefinition
   }

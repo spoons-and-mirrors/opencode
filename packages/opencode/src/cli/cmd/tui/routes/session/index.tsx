@@ -68,6 +68,7 @@ import { Footer } from "./footer.tsx"
 import { usePromptRef } from "../../context/prompt"
 import { Filesystem } from "@/util/filesystem"
 import { DialogSubagent } from "./dialog-subagent.tsx"
+import { PluginRegistry, PluginUIRenderer } from "../../plugin-ui"
 
 addDefaultParsers(parsers.parsers)
 
@@ -109,6 +110,22 @@ export function Session() {
   const session = createMemo(() => sync.session.get(route.sessionID)!)
   const messages = createMemo(() => sync.data.message[route.sessionID] ?? [])
   const permissions = createMemo(() => sync.data.permission[route.sessionID] ?? [])
+
+  // Find plugin component that wants to replace the input (and isn't dismissed)
+  const replaceInputPlugin = createMemo(() => {
+    for (const msg of messages()) {
+      const parts = sync.data.part[msg.id] ?? []
+      for (const part of parts) {
+        if (part.type === "text" && part.plugin) {
+          const componentName = part.text.trim()
+          if (PluginRegistry.shouldReplaceInput(componentName) && !PluginRegistry.isDismissed(part.id)) {
+            return { component: componentName, partId: part.id, metadata: part.metadata }
+          }
+        }
+      }
+    }
+    return null
+  })
 
   const pending = createMemo(() => {
     return messages().findLast((x) => x.role === "assistant" && !x.time.completed)?.id
@@ -670,7 +687,7 @@ export function Session() {
           if (!parts || !Array.isArray(parts)) continue
 
           const hasValidTextPart = parts.some(
-            (part) => part && part.type === "text" && !part.synthetic && !part.ignored,
+            (part) => part && part.type === "text" && !part.synthetic && !part.ignored && !part.plugin,
           )
 
           if (hasValidTextPart) {
@@ -1082,17 +1099,30 @@ export function Session() {
               </For>
             </scrollbox>
             <box flexShrink={0}>
-              <Prompt
-                ref={(r) => {
-                  prompt = r
-                  promptRef.set(r)
+              <Show when={!replaceInputPlugin()}>
+                <Prompt
+                  ref={(r) => {
+                    prompt = r
+                    promptRef.set(r)
+                  }}
+                  disabled={permissions().length > 0}
+                  onSubmit={() => {
+                    toBottom()
+                  }}
+                  sessionID={route.sessionID}
+                />
+              </Show>
+              <Show when={replaceInputPlugin()}>
+                {(plugin) => {
+                  const template = PluginRegistry.get(plugin().component)
+                  return template ? (
+                    <PluginUIRenderer
+                      node={template}
+                      metadata={{ ...plugin().metadata, _component: plugin().component, _partId: plugin().partId }}
+                    />
+                  ) : null
                 }}
-                disabled={permissions().length > 0}
-                onSubmit={() => {
-                  toBottom()
-                }}
-                sessionID={route.sessionID}
-              />
+              </Show>
             </box>
             <Show when={(!sidebarVisible() || sidebarOverlay()) && tall()}>
               <Footer />
@@ -1145,8 +1175,21 @@ function UserMessage(props: {
 }) {
   const ctx = use()
   const local = useLocal()
-  const text = createMemo(() => props.parts.flatMap((x) => (x.type === "text" && !x.synthetic ? [x] : []))[0])
+  const text = createMemo(
+    () => props.parts.flatMap((x) => (x.type === "text" && !x.synthetic && !x.plugin ? [x] : []))[0],
+  )
   const files = createMemo(() => props.parts.flatMap((x) => (x.type === "file" ? [x] : [])))
+  const pluginParts = createMemo(() =>
+    props.parts.flatMap((x): TextPart[] => {
+      if (x.type === "text" && x.plugin) {
+        const componentName = x.text.trim()
+        // Never render replaceInput plugin parts in chat history
+        if (PluginRegistry.shouldReplaceInput(componentName)) return []
+        return [x]
+      }
+      return []
+    }),
+  )
   const sync = useSync()
   const { theme, syntax } = useTheme()
   const [hover, setHover] = createSignal(false)
@@ -1243,6 +1286,20 @@ function UserMessage(props: {
           borderColor={theme.borderActive}
         />
       </Show>
+      <For each={pluginParts()}>
+        {(part) => {
+          const componentName = part.text.trim()
+          const metadata = { ...(part.metadata ?? {}), _component: componentName, _partId: part.id }
+          const template = PluginRegistry.get(componentName)
+          return (
+            <Show when={template}>
+              <box id={"plugin-" + part.id} flexShrink={0}>
+                <PluginUIRenderer node={template!} metadata={metadata} />
+              </box>
+            </Show>
+          )
+        }}
+      </For>
     </>
   )
 }

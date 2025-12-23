@@ -56,6 +56,8 @@ import type {
   PathGetResponses,
   PermissionRespondErrors,
   PermissionRespondResponses,
+  PluginsUiEventResponses,
+  PluginsUiResponses,
   ProjectCurrentResponses,
   ProjectListResponses,
   ProjectUpdateErrors,
@@ -306,6 +308,72 @@ export class Project extends HeyApiClient {
       },
     })
   }
+}
+
+export class Ui extends HeyApiClient {
+  /**
+   * Send UI event to plugin
+   *
+   * Send an event from a plugin UI component back to the plugin.
+   */
+  public event<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      component?: string
+      event?: string
+      data?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "body", key: "component" },
+            { in: "body", key: "event" },
+            { in: "body", key: "data" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<PluginsUiEventResponses, unknown, ThrowOnError>({
+      url: "/plugins/ui/event",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Plugins extends HeyApiClient {
+  /**
+   * List plugin UI components
+   *
+   * Get a list of all registered plugin UI components with their templates.
+   */
+  public ui<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<PluginsUiResponses, unknown, ThrowOnError>({
+      url: "/plugins/ui",
+      ...options,
+      ...params,
+    })
+  }
+
+  ui2 = new Ui({ client: this.client })
 }
 
 export class Pty extends HeyApiClient {
@@ -2666,6 +2734,8 @@ export class OpencodeClient extends HeyApiClient {
   global = new Global({ client: this.client })
 
   project = new Project({ client: this.client })
+
+  plugins = new Plugins({ client: this.client })
 
   pty = new Pty({ client: this.client })
 
