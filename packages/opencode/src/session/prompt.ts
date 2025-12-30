@@ -284,7 +284,6 @@ export namespace SessionPrompt {
 
       const model = await Provider.getModel(lastUser.model.providerID, lastUser.model.modelID)
 
-      // Extract all subtasks for parallel execution
       const subtasks = tasks.filter((t): t is Extract<typeof t, { type: "subtask" }> => t.type === "subtask")
       const otherTasks = tasks.filter((t) => t.type !== "subtask")
       tasks.length = 0
@@ -424,7 +423,6 @@ export namespace SessionPrompt {
           }
         }
 
-        // Run all subtasks in parallel
         await Promise.all(subtasks.map(executeSubtask))
 
         // Add synthetic user message to prevent certain reasoning models from erroring
