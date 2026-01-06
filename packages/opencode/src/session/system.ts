@@ -122,15 +122,12 @@ export namespace SystemPrompt {
         .catch(() => "")
         .then((x) => "Instructions from: " + p + "\n" + x),
     )
-    const foundUrls = urls.map((url) => {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 5000)
-      return fetch(url, { signal: controller.signal })
+    const foundUrls = urls.map((url) =>
+      fetch(url, { signal: AbortSignal.timeout(5000) })
         .then((res) => (res.ok ? res.text() : ""))
         .catch(() => "")
-        .finally(() => clearTimeout(timeout))
-        .then((x) => (x ? "Instructions from: " + url + "\n" + x : ""))
-    })
+        .then((x) => (x ? "Instructions from: " + url + "\n" + x : "")),
+    )
     return Promise.all([...foundFiles, ...foundUrls]).then((result) => result.filter(Boolean))
   }
 }
