@@ -33,6 +33,7 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
   const confirm = createMemo(() => !single() && store.tab === questions().length)
   const options = createMemo(() => question()?.options ?? [])
   const customInput = createMemo(() => question()?.customInput !== false)
+  const hasDescriptions = createMemo(() => options().some((opt) => opt.description))
   const other = createMemo(() => store.selected === options().length)
   const input = createMemo(() => store.custom[store.tab] ?? "")
   const multi = createMemo(() => question()?.multiple === true)
@@ -252,9 +253,9 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
         </Show>
 
         <Show when={!confirm()}>
-          <box paddingLeft={1} gap={1}>
+          <box paddingLeft={1} gap={hasDescriptions() ? 1 : 0}>
             <box>
-              <text fg={theme.text}>
+              <text fg={theme.text} marginBottom={hasDescriptions() ? 0 : 1}>
                 {question()?.question}
                 {multi() ? " (select all that apply)" : ""}
               </text>
@@ -274,9 +275,11 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
                         </box>
                         <text fg={theme.success}>{picked() ? "✓" : ""}</text>
                       </box>
-                      <box paddingLeft={3}>
-                        <text fg={theme.textMuted}>{opt.description}</text>
-                      </box>
+                      <Show when={opt.description}>
+                        <box paddingLeft={3}>
+                          <text fg={theme.textMuted}>{opt.description}</text>
+                        </box>
+                      </Show>
                     </box>
                   )
                 }}
