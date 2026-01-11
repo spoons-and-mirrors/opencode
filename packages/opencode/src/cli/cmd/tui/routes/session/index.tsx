@@ -1489,7 +1489,13 @@ function InlineTool(props: {
   )
 }
 
-function BlockTool(props: { title: string; children: JSX.Element; onClick?: () => void; part?: ToolPart }) {
+function BlockTool(props: {
+  title: string
+  titleHashColor?: RGBA
+  children: JSX.Element
+  onClick?: () => void
+  part?: ToolPart
+}) {
   const { theme } = useTheme()
   const renderer = useRenderer()
   const [hover, setHover] = createSignal(false)
@@ -1513,7 +1519,11 @@ function BlockTool(props: { title: string; children: JSX.Element; onClick?: () =
       }}
     >
       <text paddingLeft={3} fg={theme.textMuted}>
-        {props.title}
+        <Show fallback={props.title} when={props.titleHashColor && props.title.startsWith("◉")}>
+          <span style={{ fg: props.titleHashColor }}>◉</span>
+          <span style={{ fg: theme.text }}>{props.title.slice(1).split(" Task")[0]}</span>
+          {" Task"}
+        </Show>
       </text>
       {props.children}
       <Show when={error()}>
@@ -1686,7 +1696,8 @@ function Task(props: ToolProps<typeof TaskTool>) {
     <Switch>
       <Match when={props.metadata.summary?.length}>
         <BlockTool
-          title={"# " + Locale.titlecase(props.input.subagent_type ?? "unknown") + " Task"}
+          title={"◉ " + Locale.titlecase(props.input.subagent_type ?? "unknown") + " Task"}
+          titleHashColor={color()}
           onClick={
             props.metadata.sessionId
               ? () => navigate({ type: "session", sessionID: props.metadata.sessionId! })
