@@ -525,7 +525,7 @@ export type QuestionOption = {
   /**
    * Explanation of choice
    */
-  description: string
+  description?: string
 }
 
 export type QuestionInfo = {
@@ -545,6 +545,10 @@ export type QuestionInfo = {
    * Allow selecting multiple choices
    */
   multiple?: boolean
+  /**
+   * Allow users to type their own answer (default: true)
+   */
+  customInput?: boolean
 }
 
 export type QuestionRequest = {

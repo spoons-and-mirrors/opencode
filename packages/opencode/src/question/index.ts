@@ -11,7 +11,7 @@ export namespace Question {
   export const Option = z
     .object({
       label: z.string().describe("Display text (1-5 words, concise)"),
-      description: z.string().describe("Explanation of choice"),
+      description: z.string().optional().describe("Explanation of choice"),
     })
     .meta({
       ref: "QuestionOption",
@@ -24,6 +24,7 @@ export namespace Question {
       header: z.string().max(12).describe("Very short label (max 12 chars)"),
       options: z.array(Option).describe("Available choices"),
       multiple: z.boolean().optional().describe("Allow selecting multiple choices"),
+      customInput: z.boolean().optional().describe("Allow users to type their own answer (default: true)"),
     })
     .meta({
       ref: "QuestionInfo",
