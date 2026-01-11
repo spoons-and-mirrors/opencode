@@ -1,4 +1,5 @@
 import { QuestionTool } from "./question"
+import { Question } from "../question"
 import { BashTool } from "./bash"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
@@ -65,7 +66,20 @@ export namespace ToolRegistry {
         parameters: z.object(def.args),
         description: def.description,
         execute: async (args, ctx) => {
-          const result = await def.execute(args as any, ctx)
+          const pluginCtx = {
+            sessionID: ctx.sessionID,
+            messageID: ctx.messageID,
+            agent: ctx.agent,
+            abort: ctx.abort,
+            ask: async (input: { questions: Question.Info[] }) => {
+              return Question.ask({
+                sessionID: ctx.sessionID,
+                questions: input.questions,
+                tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
+              })
+            },
+          }
+          const result = await def.execute(args as any, pluginCtx)
           const out = await Truncate.output(result, {}, initCtx?.agent)
           return {
             title: "",

@@ -5,6 +5,19 @@ export type ToolContext = {
   messageID: string
   agent: string
   abort: AbortSignal
+  ask(input: { questions: QuestionInfo[] }): Promise<string[][]>
+}
+
+export interface QuestionOption {
+  label: string
+  description: string
+}
+
+export interface QuestionInfo {
+  question: string
+  header: string
+  options: QuestionOption[]
+  multiple?: boolean
 }
 
 export function tool<Args extends z.ZodRawShape>(input: {

@@ -8,6 +8,7 @@ import { BunProc } from "../bun"
 import { Instance } from "../project/instance"
 import { Flag } from "../flag/flag"
 import { CodexAuthPlugin } from "./codex"
+import { Question } from "../question"
 
 export namespace Plugin {
   const log = Log.create({ service: "plugin" })
@@ -32,6 +33,12 @@ export namespace Plugin {
       directory: Instance.directory,
       serverUrl: Server.url(),
       $: Bun.$,
+      ask: async (args) => {
+        return Question.ask({
+          sessionID: args.sessionID,
+          questions: args.questions,
+        })
+      },
     }
 
     for (const plugin of INTERNAL_PLUGINS) {

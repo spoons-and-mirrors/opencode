@@ -13,7 +13,7 @@ import type {
 } from "@opencode-ai/sdk"
 
 import type { BunShell } from "./shell"
-import { type ToolDefinition } from "./tool"
+import { type ToolDefinition, type QuestionInfo } from "./tool"
 
 export * from "./tool"
 
@@ -30,6 +30,7 @@ export type PluginInput = {
   worktree: string
   serverUrl: URL
   $: BunShell
+  ask(input: { sessionID: string; questions: QuestionInfo[] }): Promise<string[][]>
 }
 
 export type Plugin = (input: PluginInput) => Promise<Hooks>
