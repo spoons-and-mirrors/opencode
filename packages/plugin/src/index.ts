@@ -13,7 +13,8 @@ import type {
 } from "@opencode-ai/sdk"
 
 import type { BunShell } from "./shell"
-import { type ToolDefinition, type QuestionInfo } from "./tool"
+import { type ToolDefinition } from "./tool"
+import type { QuestionInfo } from "@opencode-ai/sdk/v2"
 
 export * from "./tool"
 

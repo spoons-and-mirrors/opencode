@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { QuestionInfo } from "@opencode-ai/sdk/v2"
 
 export type ToolContext = {
   sessionID: string
@@ -6,18 +7,6 @@ export type ToolContext = {
   agent: string
   abort: AbortSignal
   ask(input: { questions: QuestionInfo[] }): Promise<string[][]>
-}
-
-export interface QuestionOption {
-  label: string
-  description: string
-}
-
-export interface QuestionInfo {
-  question: string
-  header: string
-  options: QuestionOption[]
-  multiple?: boolean
 }
 
 export function tool<Args extends z.ZodRawShape>(input: {
