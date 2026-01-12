@@ -316,6 +316,11 @@ export namespace SessionPrompt {
       // TODO: centralize "invoke tool" logic
       if (task?.type === "subtask") {
         const taskTool = await TaskTool.init()
+        const taskAgent = await Agent.get(task.agent)
+
+        const resolveModel = task.model ?? taskAgent.model ?? lastUser.model
+        const taskModel = await Provider.getModel(resolveModel.providerID, resolveModel.modelID)
+
         const assistantMessage = (await Session.updateMessage({
           id: Identifier.ascending("message"),
           role: "assistant",
@@ -334,8 +339,8 @@ export namespace SessionPrompt {
             reasoning: 0,
             cache: { read: 0, write: 0 },
           },
-          modelID: model.id,
-          providerID: model.providerID,
+          modelID: taskModel.id,
+          providerID: taskModel.providerID,
           time: {
             created: Date.now(),
           },
@@ -376,7 +381,6 @@ export namespace SessionPrompt {
           { args: taskArgs },
         )
         let executionError: Error | undefined
-        const taskAgent = await Agent.get(task.agent)
         const taskCtx: Tool.Context = {
           agent: task.agent,
           messageID: assistantMessage.id,
@@ -1551,6 +1555,7 @@ export namespace SessionPrompt {
           {
             type: "subtask" as const,
             agent: agent.name,
+            model: { providerID: model.providerID, modelID: model.modelID },
             description: command.description ?? "",
             command: input.command,
             // TODO: how can we make task tool accept a more complex input?
@@ -1560,11 +1565,16 @@ export namespace SessionPrompt {
       : [...templateParts, ...(input.parts ?? [])]
 
     const userAgent = isSubtask ? (input.agent ?? (await Agent.defaultAgent())) : agentName
+    const userModel = isSubtask
+      ? input.model
+        ? Provider.parseModel(input.model)
+        : await lastModel(input.sessionID)
+      : model
 
     const result = (await prompt({
       sessionID: input.sessionID,
       messageID: input.messageID,
-      model,
+      model: userModel,
       agent: userAgent,
       parts,
       variant: input.variant,
