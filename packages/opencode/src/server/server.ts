@@ -1465,6 +1465,16 @@ export namespace Server {
             })
           },
         )
+        // notify_once endpoint - type chain broken intentionally to avoid TS2589
+        .post("/session/:sessionID/notify_once", async (c) => {
+          const sessionID = c.req.param("sessionID")
+          const body = await c.req.json<{ text: string }>()
+          if (!body.text) {
+            return c.json({ error: "text is required" }, 400)
+          }
+          const msg = await SessionPrompt.notifyOnce(sessionID, body.text)
+          return c.json(msg)
+        })
         .post(
           "/session/:sessionID/command",
           describeRoute({

@@ -638,6 +638,119 @@ export namespace SessionPrompt {
     return Provider.defaultModel()
   }
 
+  /**
+   * Run a single model iteration on a session, bypassing the busy lock.
+   * Used for parent-child communication when parent is blocked on TaskTool.
+   * Creates a synthetic user message with the given text and runs one model call.
+   */
+  export async function notifyOnce(sessionID: string, text: string): Promise<MessageV2.WithParts | undefined> {
+    const session = await Session.get(sessionID)
+    const msgs = await MessageV2.filterCompacted(MessageV2.stream(sessionID))
+
+    // Find last user to get agent/model info
+    let lastUser: MessageV2.User | undefined
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const msg = msgs[i]
+      if (msg.info.role === "user") {
+        lastUser = msg.info as MessageV2.User
+        break
+      }
+    }
+
+    if (!lastUser) {
+      log.warn("notifyOnce: no user message found", { sessionID })
+      return undefined
+    }
+
+    // Create synthetic user message with notification text
+    const syntheticUser: MessageV2.User = {
+      id: Identifier.ascending("message"),
+      sessionID,
+      role: "user",
+      time: { created: Date.now() },
+      agent: lastUser.agent,
+      model: lastUser.model,
+    }
+    await Session.updateMessage(syntheticUser)
+    await Session.updatePart({
+      id: Identifier.ascending("part"),
+      messageID: syntheticUser.id,
+      sessionID,
+      type: "text",
+      text,
+      synthetic: true,
+    } satisfies MessageV2.TextPart)
+
+    // Get updated messages including the synthetic one
+    const updatedMsgs = await MessageV2.filterCompacted(MessageV2.stream(sessionID))
+
+    // Set up for one model call
+    const model = await Provider.getModel(lastUser.model.providerID, lastUser.model.modelID)
+    const agent = await Agent.get(lastUser.agent)
+    const abort = new AbortController()
+
+    const processor = SessionProcessor.create({
+      assistantMessage: (await Session.updateMessage({
+        id: Identifier.ascending("message"),
+        parentID: syntheticUser.id,
+        role: "assistant",
+        mode: agent.name,
+        agent: agent.name,
+        path: {
+          cwd: Instance.directory,
+          root: Instance.worktree,
+        },
+        cost: 0,
+        tokens: {
+          input: 0,
+          output: 0,
+          reasoning: 0,
+          cache: { read: 0, write: 0 },
+        },
+        modelID: model.id,
+        providerID: model.providerID,
+        time: { created: Date.now() },
+        sessionID,
+      })) as MessageV2.Assistant,
+      sessionID,
+      model,
+      abort: abort.signal,
+    })
+
+    const tools = await resolveTools({
+      agent,
+      session,
+      model,
+      tools: lastUser.tools,
+      processor,
+      bypassAgentCheck: false,
+    })
+
+    // Trigger plugin hook for message transform (allows IAM to inject notifications)
+    const sessionMessages = clone(updatedMsgs)
+    await Plugin.trigger("experimental.chat.messages.transform", {}, { messages: sessionMessages })
+
+    // Run exactly one model call
+    await processor.process({
+      user: syntheticUser,
+      agent,
+      abort: abort.signal,
+      sessionID,
+      system: [...(await SystemPrompt.environment()), ...(await SystemPrompt.custom())],
+      messages: MessageV2.toModelMessage(sessionMessages),
+      tools,
+      model,
+    })
+
+    // Return the assistant message
+    for await (const item of MessageV2.stream(sessionID)) {
+      if (item.info.role === "assistant" && item.info.id > syntheticUser.id) {
+        return item
+      }
+    }
+    return undefined
+  }
+
   async function resolveTools(input: {
     agent: Agent.Info
     model: Provider.Model
