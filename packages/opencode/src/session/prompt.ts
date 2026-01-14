@@ -622,6 +622,25 @@ export namespace SessionPrompt {
       continue
     }
     SessionCompaction.prune({ sessionID })
+
+    // Allow plugins to optionally resume this session before it completes
+    const sessionInfo = await Session.get(sessionID)
+    const beforeCompleteOutput = { resumePrompt: undefined as string | undefined }
+    await Plugin.trigger(
+      "session.before_complete",
+      { sessionID, parentSessionID: sessionInfo?.parentID },
+      beforeCompleteOutput,
+    )
+
+    if (beforeCompleteOutput.resumePrompt) {
+      log.info("resuming session", { sessionID })
+      delete state()[sessionID]
+      await prompt({
+        sessionID,
+        parts: [{ type: "text", text: beforeCompleteOutput.resumePrompt }],
+      })
+    }
+
     for await (const item of MessageV2.stream(sessionID)) {
       if (item.info.role === "user") continue
       const queued = state()[sessionID]?.callbacks ?? []

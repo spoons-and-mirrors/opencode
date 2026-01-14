@@ -215,4 +215,9 @@ export interface Hooks {
     input: { sessionID: string; messageID: string; partID: string },
     output: { text: string },
   ) => Promise<void>
+
+  "session.before_complete"?: (
+    input: { sessionID: string; parentSessionID?: string },
+    output: { resumePrompt?: string },
+  ) => Promise<void>
 }
