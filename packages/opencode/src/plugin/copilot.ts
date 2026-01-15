@@ -4,6 +4,14 @@ import { iife } from "@/util/iife"
 
 const CLIENT_ID = "Ov23li8tweQw6odWQebz"
 
+// Track user message count for main session (2 out of 3 pattern)
+// Pattern: 1st=user, 2nd=agent, 3rd=agent, 4th=user, 5th=agent, 6th=agent...
+let mainSessionUserMessageCount = 0
+
+// Track active child session (for subtask/Task tool)
+// When a child session is active, all requests should be isAgent=true
+let activeChildSessionID: string | null = null
+
 function normalizeDomain(url: string) {
   return url.replace(/^https?:\/\//, "").replace(/\/$/, "")
 }
@@ -17,6 +25,22 @@ function getUrls(domain: string) {
 
 export async function CopilotAuthPlugin(input: PluginInput): Promise<Hooks> {
   return {
+    // Handle session events for child session tracking
+    event: async ({ event }) => {
+      if (event.type === "session.created") {
+        const session = (event as any).properties?.info
+        if (session?.id && session?.parentID) {
+          // Child session created - mark it as active
+          activeChildSessionID = session.id
+        }
+      } else if (event.type === "session.idle") {
+        const sessionID = (event as any).properties?.sessionID
+        // If the idle session is our active child session, reset
+        if (sessionID && sessionID === activeChildSessionID) {
+          activeChildSessionID = null
+        }
+      }
+    },
     auth: {
       provider: "github-copilot",
       async loader(getAuth, provider) {
@@ -49,30 +73,57 @@ export async function CopilotAuthPlugin(input: PluginInput): Promise<Hooks> {
             if (info.type !== "oauth") return fetch(request, init)
 
             const { isVision, isAgent } = iife(() => {
+              // If a child session is active (subtask/Task tool), always use agent
+              if (activeChildSessionID) {
+                return { isVision: false, isAgent: true }
+              }
+              
               try {
                 const body = typeof init?.body === "string" ? JSON.parse(init.body) : init?.body
 
                 // Completions API
                 if (body?.messages) {
                   const last = body.messages[body.messages.length - 1]
+                  const isContinuation = last?.role && ["tool", "assistant"].includes(last.role)
+                  
+                  let isAgent: boolean
+                  if (isContinuation) {
+                    isAgent = true
+                  } else {
+                    // New user turn - apply 2-out-of-3 pattern
+                    mainSessionUserMessageCount++
+                    isAgent = mainSessionUserMessageCount % 3 !== 1
+                  }
+                  
                   return {
                     isVision: body.messages.some(
                       (msg: any) =>
                         Array.isArray(msg.content) && msg.content.some((part: any) => part.type === "image_url"),
                     ),
-                    isAgent: last?.role !== "user",
+                    isAgent,
                   }
                 }
 
                 // Responses API
                 if (body?.input) {
                   const last = body.input[body.input.length - 1]
+                  const isContinuation = last?.role !== "user"
+                  
+                  let isAgent: boolean
+                  if (isContinuation) {
+                    isAgent = true
+                  } else {
+                    // New user turn - apply 2-out-of-3 pattern
+                    mainSessionUserMessageCount++
+                    isAgent = mainSessionUserMessageCount % 3 !== 1
+                  }
+                  
                   return {
                     isVision: body.input.some(
                       (item: any) =>
                         Array.isArray(item?.content) && item.content.some((part: any) => part.type === "input_image"),
                     ),
-                    isAgent: last?.role !== "user",
+                    isAgent,
                   }
                 }
               } catch {}
