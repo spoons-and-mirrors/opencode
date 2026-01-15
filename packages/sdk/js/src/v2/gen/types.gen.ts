@@ -430,6 +430,11 @@ export type Part =
       description: string
       agent: string
       command?: string
+      parentAgent?: string
+      parentModel?: {
+        providerID: string
+        modelID: string
+      }
     }
   | ReasoningPart
   | FilePart
@@ -1854,6 +1859,11 @@ export type SubtaskPartInput = {
   description: string
   agent: string
   command?: string
+  parentAgent?: string
+  parentModel?: {
+    providerID: string
+    modelID: string
+  }
 }
 
 export type Command = {
