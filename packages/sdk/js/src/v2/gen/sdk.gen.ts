@@ -128,6 +128,8 @@ import type {
   SessionSummarizeResponses,
   SessionTodoErrors,
   SessionTodoResponses,
+  SessionToolErrors,
+  SessionToolResponses,
   SessionUnrevertErrors,
   SessionUnrevertResponses,
   SessionUnshareErrors,
@@ -1386,6 +1388,35 @@ export class Session extends HeyApiClient {
       url: "/session/{sessionID}/message/{messageID}",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Insert tool message
+   *
+   * Persist a tool call/result as an assistant message in a session.
+   */
+  public tool<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      body?: unknown
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [{ args: [{ in: "path", key: "sessionID" }, { in: "query", key: "directory" }, { in: "body" }] }],
+    )
+    return (options?.client ?? this.client).post<SessionToolResponses, SessionToolErrors, ThrowOnError>({
+      url: "/session/{sessionID}/tool",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 
