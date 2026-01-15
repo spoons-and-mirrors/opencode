@@ -3338,6 +3338,45 @@ export type PartUpdateResponses = {
 
 export type PartUpdateResponse = PartUpdateResponses[keyof PartUpdateResponses]
 
+export type SessionToolData = {
+  body?: unknown
+  path: {
+    /**
+     * Session ID
+     */
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/tool"
+}
+
+export type SessionToolErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionToolError = SessionToolErrors[keyof SessionToolErrors]
+
+export type SessionToolResponses = {
+  /**
+   * Created tool message
+   */
+  200: {
+    info: AssistantMessage
+    parts: Array<Part>
+  }
+}
+
+export type SessionToolResponse = SessionToolResponses[keyof SessionToolResponses]
+
 export type SessionPromptAsyncData = {
   body?: {
     messageID?: string

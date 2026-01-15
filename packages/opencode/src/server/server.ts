@@ -55,12 +55,23 @@ import { QuestionRoute } from "./question"
 import { Installation } from "@/installation"
 import { MDNS } from "./mdns"
 import { Worktree } from "../worktree"
+import { Identifier } from "@/id/id"
+import { ulid } from "ulid"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
 
 export namespace Server {
   const log = Log.create({ service: "server" })
+  const ToolInsertSchema = z.object({
+    parentID: z.string().optional(),
+    tool: z.string(),
+    input: z.record(z.string(), z.unknown()).optional(),
+    output: z.string(),
+    title: z.string().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+    callID: z.string().optional(),
+  })
 
   let _url: URL | undefined
   let _corsWhitelist: string[] = []
@@ -78,6 +89,7 @@ export namespace Server {
   export const App: () => Hono = lazy(
     () =>
       // TODO: Break server.ts into smaller route files to fix type inference
+      // @ts-ignore - complex chain type depth
       app
         .onError((err, c) => {
           log.error("failed", {
@@ -1405,6 +1417,102 @@ export namespace Server {
             }
             const part = await Session.updatePart(body)
             return c.json(part)
+          },
+        )
+        .post(
+          "/session/:sessionID/tool",
+          describeRoute({
+            summary: "Insert tool message",
+            description: "Persist a tool call/result as an assistant message in a session.",
+            operationId: "session.tool",
+            responses: {
+              200: {
+                description: "Created tool message",
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.object({
+                        info: MessageV2.Assistant,
+                        parts: MessageV2.Part.array(),
+                      }),
+                    ),
+                  },
+                },
+              },
+              ...errors(400, 404),
+            },
+          }),
+          validator(
+            "param",
+            z.object({
+              sessionID: z.string().meta({ description: "Session ID" }),
+            }),
+          ),
+          validator("json", z.any()),
+          async (c) => {
+            const sessionID = c.req.valid("param").sessionID
+            const body = ToolInsertSchema.parse(c.req.valid("json")) as z.infer<typeof ToolInsertSchema>
+            const messages = await Session.messages({ sessionID })
+            const lastUser = messages.findLast((msg) => msg.info.role === "user")
+            if (!lastUser) {
+              throw new Error("No user message found for tool insertion.")
+            }
+            const lastUserInfo = lastUser.info as MessageV2.User
+            const parentID = body.parentID ?? lastUserInfo.id
+            const now = Date.now()
+
+            const assistant: MessageV2.Assistant = {
+              id: Identifier.ascending("message"),
+              sessionID,
+              parentID,
+              role: "assistant",
+              mode: lastUserInfo.agent,
+              agent: lastUserInfo.agent,
+              path: {
+                cwd: Instance.directory,
+                root: Instance.worktree,
+              },
+              cost: 0,
+              tokens: {
+                input: 0,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+              modelID: lastUserInfo.model.modelID,
+              providerID: lastUserInfo.model.providerID,
+              time: {
+                created: now,
+                completed: now,
+              },
+              finish: "tool-calls",
+            }
+
+            await Session.updateMessage(assistant)
+
+            const toolPart: MessageV2.ToolPart = {
+              id: Identifier.ascending("part"),
+              messageID: assistant.id,
+              sessionID,
+              type: "tool",
+              tool: body.tool,
+              callID: body.callID ?? ulid(),
+              state: {
+                status: "completed",
+                input: body.input ?? {},
+                output: body.output,
+                title: body.title ?? body.tool,
+                metadata: body.metadata ?? {},
+                time: {
+                  start: now,
+                  end: now,
+                },
+              },
+            }
+
+            await Session.updatePart(toolPart)
+
+            return c.json({ info: assistant, parts: [toolPart] })
           },
         )
         .post(
