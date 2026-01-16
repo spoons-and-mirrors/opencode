@@ -268,14 +268,19 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           }
           const result = Binary.search(parts, event.properties.part.id, (p) => p.id)
           if (result.found) {
+            // Use reconcile for updates to preserve object identity (prevents flickering)
             setStore("part", event.properties.part.messageID, result.index, reconcile(event.properties.part))
             break
           }
+          // For inserts, re-check inside produce to avoid race condition duplicates
           setStore(
             "part",
             event.properties.part.messageID,
             produce((draft) => {
-              draft.splice(result.index, 0, event.properties.part)
+              const check = Binary.search(draft, event.properties.part.id, (p) => p.id)
+              if (!check.found) {
+                draft.splice(check.index, 0, event.properties.part)
+              }
             }),
           )
           break
