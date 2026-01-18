@@ -217,7 +217,12 @@ export interface Hooks {
   ) => Promise<void>
 
   "session.before.idle"?: (
-    input: { sessionID: string; parentSessionID?: string },
+    input: {
+      sessionID: string
+      parentSessionID?: string
+      agent?: string
+      model?: { providerID: string; modelID: string }
+    },
     output: { resumePrompt?: string },
   ) => Promise<void>
 }

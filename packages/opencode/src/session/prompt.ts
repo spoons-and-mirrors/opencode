@@ -266,6 +266,8 @@ export namespace SessionPrompt {
     using _ = defer(() => cancel(sessionID))
 
     let step = 0
+    let sessionAgent: string | undefined
+    let sessionModel: { providerID: string; modelID: string } | undefined
     const session = await Session.get(sessionID)
     while (true) {
       SessionStatus.set(sessionID, { type: "busy" })
@@ -291,6 +293,8 @@ export namespace SessionPrompt {
       }
 
       if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
+      sessionAgent = lastUser.agent
+      sessionModel = lastUser.model
       if (
         lastAssistant?.finish &&
         !["tool-calls", "unknown"].includes(lastAssistant.finish) &&
@@ -626,13 +630,19 @@ export namespace SessionPrompt {
     // Allow plugins to optionally resume this session before it completes
     const sessionInfo = await Session.get(sessionID)
     const beforeIdleOutput = { resumePrompt: undefined as string | undefined }
-    await Plugin.trigger("session.before.idle", { sessionID, parentSessionID: sessionInfo?.parentID }, beforeIdleOutput)
+    await Plugin.trigger(
+      "session.before.idle",
+      { sessionID, parentSessionID: sessionInfo?.parentID, agent: sessionAgent, model: sessionModel },
+      beforeIdleOutput,
+    )
 
     if (beforeIdleOutput.resumePrompt) {
       log.info("resuming session", { sessionID })
       delete state()[sessionID]
       await prompt({
         sessionID,
+        agent: sessionAgent,
+        model: sessionModel,
         parts: [{ type: "text", text: beforeIdleOutput.resumePrompt }],
       })
     }
