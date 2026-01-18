@@ -216,7 +216,7 @@ export interface Hooks {
     output: { text: string },
   ) => Promise<void>
 
-  "session.before_complete"?: (
+  "session.before.idle"?: (
     input: { sessionID: string; parentSessionID?: string },
     output: { resumePrompt?: string },
   ) => Promise<void>

@@ -625,19 +625,15 @@ export namespace SessionPrompt {
 
     // Allow plugins to optionally resume this session before it completes
     const sessionInfo = await Session.get(sessionID)
-    const beforeCompleteOutput = { resumePrompt: undefined as string | undefined }
-    await Plugin.trigger(
-      "session.before_complete",
-      { sessionID, parentSessionID: sessionInfo?.parentID },
-      beforeCompleteOutput,
-    )
+    const beforeIdleOutput = { resumePrompt: undefined as string | undefined }
+    await Plugin.trigger("session.before.idle", { sessionID, parentSessionID: sessionInfo?.parentID }, beforeIdleOutput)
 
-    if (beforeCompleteOutput.resumePrompt) {
+    if (beforeIdleOutput.resumePrompt) {
       log.info("resuming session", { sessionID })
       delete state()[sessionID]
       await prompt({
         sessionID,
-        parts: [{ type: "text", text: beforeCompleteOutput.resumePrompt }],
+        parts: [{ type: "text", text: beforeIdleOutput.resumePrompt }],
       })
     }
 
