@@ -123,13 +123,12 @@ export const BatchTool = Tool.define("batch", async () => {
         }
       }
 
-      const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
       const results: typeof toolCalls extends (infer T)[]
         ? (Awaited<ReturnType<typeof executeCall>> & { tool: string })[]
         : never = []
 
       for (let i = 0; i < toolCalls.length; i++) {
-        if (i > 0) await delay(50)
+        if (i > 0) await Bun.sleep(50)
         results.push(await executeCall(toolCalls[i]))
       }
 
