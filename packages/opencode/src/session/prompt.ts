@@ -92,6 +92,7 @@ export namespace SessionPrompt {
       .optional(),
     agent: z.string().optional(),
     noReply: z.boolean().optional(),
+    hideQueueBadge: z.boolean().optional(),
     tools: z
       .record(z.string(), z.boolean())
       .optional()
@@ -831,6 +832,7 @@ export namespace SessionPrompt {
       model: input.model ?? agent.model ?? (await lastModel(input.sessionID)),
       system: input.system,
       variant: input.variant,
+      hideQueueBadge: input.hideQueueBadge,
     }
 
     const parts = await Promise.all(

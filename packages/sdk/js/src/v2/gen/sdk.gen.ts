@@ -1317,6 +1317,7 @@ export class Session extends HeyApiClient {
       }
       agent?: string
       noReply?: boolean
+      hideQueueBadge?: boolean
       tools?: {
         [key: string]: boolean
       }
@@ -1337,6 +1338,7 @@ export class Session extends HeyApiClient {
             { in: "body", key: "model" },
             { in: "body", key: "agent" },
             { in: "body", key: "noReply" },
+            { in: "body", key: "hideQueueBadge" },
             { in: "body", key: "tools" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
@@ -1405,6 +1407,7 @@ export class Session extends HeyApiClient {
       }
       agent?: string
       noReply?: boolean
+      hideQueueBadge?: boolean
       tools?: {
         [key: string]: boolean
       }
@@ -1425,6 +1428,7 @@ export class Session extends HeyApiClient {
             { in: "body", key: "model" },
             { in: "body", key: "agent" },
             { in: "body", key: "noReply" },
+            { in: "body", key: "hideQueueBadge" },
             { in: "body", key: "tools" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },

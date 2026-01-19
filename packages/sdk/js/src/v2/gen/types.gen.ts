@@ -92,6 +92,7 @@ export type UserMessage = {
     [key: string]: boolean
   }
   variant?: string
+  hideQueueBadge?: boolean
 }
 
 export type ProviderAuthError = {
@@ -3160,6 +3161,7 @@ export type SessionPromptData = {
     }
     agent?: string
     noReply?: boolean
+    hideQueueBadge?: boolean
     /**
      * @deprecated tools and permissions have been merged, you can set permissions on the session itself now
      */
@@ -3347,6 +3349,7 @@ export type SessionPromptAsyncData = {
     }
     agent?: string
     noReply?: boolean
+    hideQueueBadge?: boolean
     /**
      * @deprecated tools and permissions have been merged, you can set permissions on the session itself now
      */
