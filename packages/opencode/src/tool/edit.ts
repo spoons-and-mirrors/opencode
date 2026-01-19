@@ -637,7 +637,9 @@ export function replace(content: string, oldString: string, newString: string, r
   }
 
   if (notFound) {
-    throw new Error("oldString not found in content")
+    throw new Error(
+      "oldString not found in content. Ensure exact indentation and exclude line number prefix. Precisely match the exact file content.",
+    )
   }
   throw new Error(
     "Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match.",
