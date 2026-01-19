@@ -631,8 +631,12 @@ export namespace SessionPrompt {
     if (beforeIdleOutput.resumePrompt) {
       log.info("resuming session", { sessionID })
       delete state()[sessionID]
+      const resumeAgent = await lastAgent(sessionID)
+      const resumeModel = await lastModel(sessionID)
       await prompt({
         sessionID,
+        agent: resumeAgent,
+        model: resumeModel,
         parts: [{ type: "text", text: beforeIdleOutput.resumePrompt }],
       })
     }
@@ -653,6 +657,13 @@ export namespace SessionPrompt {
       if (item.info.role === "user" && item.info.model) return item.info.model
     }
     return Provider.defaultModel()
+  }
+
+  async function lastAgent(sessionID: string) {
+    for await (const item of MessageV2.stream(sessionID)) {
+      if (item.info.role === "user" && item.info.agent) return item.info.agent
+    }
+    return Agent.defaultAgent()
   }
 
   async function resolveTools(input: {
