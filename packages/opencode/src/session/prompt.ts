@@ -1164,6 +1164,11 @@ export namespace SessionPrompt {
       }),
     ).then((x) => x.flat())
 
+    const hook: { message: MessageV2.Info; parts: MessageV2.Part[]; removeMessages?: string[] } = {
+      message: info,
+      parts,
+    }
+
     await Plugin.trigger(
       "chat.message",
       {
@@ -1173,11 +1178,12 @@ export namespace SessionPrompt {
         messageID: input.messageID,
         variant: input.variant,
       },
-      {
-        message: info,
-        parts,
-      },
+      hook,
     )
+
+    for (const messageID of hook.removeMessages ?? []) {
+      await Session.removeMessage({ sessionID: input.sessionID, messageID })
+    }
 
     await Session.updateMessage(info)
     for (const part of parts) {
