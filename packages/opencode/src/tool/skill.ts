@@ -62,7 +62,6 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         always: [params.name],
         metadata: {},
       })
-      // Load skill content
       const content = skill.content ?? (await ConfigMarkdown.parse(skill.location)).content
       const dir = skill.content ? undefined : path.dirname(skill.location)
 
