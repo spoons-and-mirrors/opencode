@@ -17,6 +17,7 @@ export namespace Skill {
     name: z.string(),
     description: z.string(),
     location: z.string(),
+    content: z.string().optional(),
   })
   export type Info = z.infer<typeof Info>
 
@@ -119,6 +120,17 @@ export namespace Skill {
         followSymlinks: true,
       })) {
         await addSkill(match)
+      }
+    }
+
+    const config = await Config.get()
+    for (const [key, skill] of Object.entries(config.skill ?? {})) {
+      const name = skill.name ?? key
+      skills[name] = {
+        name,
+        description: skill.description ?? "",
+        location: "config",
+        content: skill.content,
       }
     }
 
