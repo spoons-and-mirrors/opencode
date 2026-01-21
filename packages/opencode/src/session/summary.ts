@@ -91,7 +91,7 @@ export namespace SessionSummary {
           {
             role: "user" as const,
             content: `
-              The following is the text to summarize. Make sure to use the same language as the user message you are summarizing in your response.
+              The following is the text to summarize:
               <text>
               ${textPart?.text ?? ""}
               </text>
