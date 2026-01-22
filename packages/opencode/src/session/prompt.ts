@@ -363,6 +363,7 @@ export namespace SessionPrompt {
                 description: task.description,
                 subagent_type: task.agent,
                 command: task.command,
+                model: task.model,
               },
               time: {
                 start: Date.now(),
@@ -374,6 +375,7 @@ export namespace SessionPrompt {
             description: task.description,
             subagent_type: task.agent,
             command: task.command,
+            model: task.model,
           }
           await Plugin.trigger(
             "tool.execute.before",
