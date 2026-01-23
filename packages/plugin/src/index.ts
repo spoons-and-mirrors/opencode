@@ -223,4 +223,17 @@ export interface Hooks {
     input: { sessionID: string; messageID: string; partID: string },
     output: { text: string },
   ) => Promise<void>
+  /**
+   * Provides autocomplete options for custom triggers in the prompt
+   */
+  autocomplete?: {
+    triggers: string[]
+    resolve: (trigger: string, query: string) => Promise<AutocompleteOption[]>
+  }
+}
+
+export type AutocompleteOption = {
+  display: string
+  value: string
+  description?: string
 }

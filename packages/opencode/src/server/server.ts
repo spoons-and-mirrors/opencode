@@ -20,6 +20,7 @@ import { Skill } from "../skill/skill"
 import { Auth } from "../auth"
 import { Flag } from "../flag/flag"
 import { Command } from "../command"
+import { AutocompleteRegistry } from "../autocomplete/registry"
 import { Global } from "../global"
 import { ProjectRoutes } from "./routes/project"
 import { SessionRoutes } from "./routes/session"
@@ -269,6 +270,66 @@ export namespace Server {
           async (c) => {
             const commands = await Command.list()
             return c.json(commands)
+          },
+        )
+        .get(
+          "/autocomplete/triggers",
+          describeRoute({
+            summary: "List autocomplete triggers",
+            description: "Get a list of all registered plugin autocomplete triggers.",
+            operationId: "autocomplete.triggers",
+            responses: {
+              200: {
+                description: "List of trigger characters",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.array(z.string())),
+                  },
+                },
+              },
+            },
+          }),
+          async (c) => {
+            const triggers = await AutocompleteRegistry.triggers()
+            return c.json(triggers)
+          },
+        )
+        .get(
+          "/autocomplete/resolve",
+          describeRoute({
+            summary: "Resolve autocomplete options",
+            description: "Get autocomplete options for a given trigger and query.",
+            operationId: "autocomplete.resolve",
+            responses: {
+              200: {
+                description: "List of autocomplete options",
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.array(
+                        z.object({
+                          display: z.string(),
+                          value: z.string(),
+                          description: z.string().optional(),
+                        }),
+                      ),
+                    ),
+                  },
+                },
+              },
+            },
+          }),
+          validator(
+            "query",
+            z.object({
+              trigger: z.string().meta({ description: "The trigger character" }),
+              query: z.string().optional().meta({ description: "The query text after the trigger" }),
+            }),
+          ),
+          async (c) => {
+            const { trigger, query = "" } = c.req.valid("query")
+            const options = await AutocompleteRegistry.resolve(trigger, query)
+            return c.json(options)
           },
         )
         .post(

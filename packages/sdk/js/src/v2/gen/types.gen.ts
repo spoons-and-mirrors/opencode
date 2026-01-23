@@ -4728,6 +4728,54 @@ export type CommandListResponses = {
 
 export type CommandListResponse = CommandListResponses[keyof CommandListResponses]
 
+export type AutocompleteTriggersData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/autocomplete/triggers"
+}
+
+export type AutocompleteTriggersResponses = {
+  /**
+   * List of trigger characters
+   */
+  200: Array<string>
+}
+
+export type AutocompleteTriggersResponse = AutocompleteTriggersResponses[keyof AutocompleteTriggersResponses]
+
+export type AutocompleteResolveData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    /**
+     * The trigger character
+     */
+    trigger: string
+    /**
+     * The query text after the trigger
+     */
+    query?: string
+  }
+  url: "/autocomplete/resolve"
+}
+
+export type AutocompleteResolveResponses = {
+  /**
+   * List of autocomplete options
+   */
+  200: Array<{
+    display: string
+    value: string
+    description?: string
+  }>
+}
+
+export type AutocompleteResolveResponse = AutocompleteResolveResponses[keyof AutocompleteResolveResponses]
+
 export type AppLogData = {
   body?: {
     /**

@@ -11,6 +11,8 @@ import type {
   Auth as Auth3,
   AuthSetErrors,
   AuthSetResponses,
+  AutocompleteResolveResponses,
+  AutocompleteTriggersResponses,
   CommandListResponses,
   Config as Config2,
   ConfigGetResponses,
@@ -2908,6 +2910,59 @@ export class Command extends HeyApiClient {
   }
 }
 
+export class Autocomplete extends HeyApiClient {
+  /**
+   * List autocomplete triggers
+   *
+   * Get a list of all registered plugin autocomplete triggers.
+   */
+  public triggers<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<AutocompleteTriggersResponses, unknown, ThrowOnError>({
+      url: "/autocomplete/triggers",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Resolve autocomplete options
+   *
+   * Get autocomplete options for a given trigger and query.
+   */
+  public resolve<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      trigger: string
+      query?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "trigger" },
+            { in: "query", key: "query" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<AutocompleteResolveResponses, unknown, ThrowOnError>({
+      url: "/autocomplete/resolve",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class App extends HeyApiClient {
   /**
    * Write log
@@ -3199,6 +3254,11 @@ export class OpencodeClient extends HeyApiClient {
   private _command?: Command
   get command(): Command {
     return (this._command ??= new Command({ client: this.client }))
+  }
+
+  private _autocomplete?: Autocomplete
+  get autocomplete(): Autocomplete {
+    return (this._autocomplete ??= new Autocomplete({ client: this.client }))
   }
 
   private _app?: App

@@ -48,7 +48,7 @@ function extractLineRange(input: string) {
 export type AutocompleteRef = {
   onInput: (value: string) => void
   onKeyDown: (e: KeyEvent) => void
-  visible: false | "@" | "/"
+  visible: false | string
 }
 
 export type AutocompleteOption = {
@@ -319,6 +319,46 @@ export function Autocomplete(props: {
     return options
   })
 
+  const [pluginOptions] = createResource(
+    () => ({ trigger: store.visible, query: filter() }),
+    async ({ trigger, query }) => {
+      if (!trigger || trigger === "@" || trigger === "/") return []
+
+      const result = await sdk.client.autocomplete.resolve({
+        trigger,
+        query: query ?? "",
+      })
+
+      if (result.error || !result.data) return []
+
+      return result.data.map(
+        (opt): AutocompleteOption => ({
+          display: opt.display,
+          description: opt.description,
+          onSelect: () => {
+            const input = props.input()
+            const currentCursorOffset = input.cursorOffset
+
+            const charAfterCursor = props.value.at(currentCursorOffset)
+            const needsSpace = charAfterCursor !== " "
+            const append = opt.value + (needsSpace ? " " : "")
+
+            input.cursorOffset = store.index
+            const startCursor = input.logicalCursor
+            input.cursorOffset = currentCursorOffset
+            const endCursor = input.logicalCursor
+
+            input.deleteRange(startCursor.row, startCursor.col, endCursor.row, endCursor.col)
+            input.insertText(append)
+          },
+        }),
+      )
+    },
+    {
+      initialValue: [],
+    },
+  )
+
   const agents = createMemo(() => {
     const agents = sync.data.agent
     return agents
@@ -372,9 +412,14 @@ export function Autocomplete(props: {
     const filesValue = files()
     const agentsValue = agents()
     const commandsValue = commands()
+    const pluginValue = pluginOptions()
 
     const mixed: AutocompleteOption[] =
-      store.visible === "@" ? [...agentsValue, ...(filesValue || []), ...mcpResources()] : [...commandsValue]
+      store.visible === "@"
+        ? [...agentsValue, ...(filesValue || []), ...mcpResources()]
+        : store.visible === "/"
+          ? [...commandsValue]
+          : [...(pluginValue || [])]
 
     const currentFilter = filter()
 
@@ -382,7 +427,7 @@ export function Autocomplete(props: {
       return mixed
     }
 
-    if (files.loading && prev && prev.length > 0) {
+    if ((files.loading || pluginOptions.loading) && prev && prev.length > 0) {
       return prev
     }
 
@@ -461,7 +506,7 @@ export function Autocomplete(props: {
     setStore("selected", 0)
   }
 
-  function show(mode: "@" | "/") {
+  function show(mode: string) {
     command.keybinds(false)
     setStore({
       visible: mode,
@@ -516,14 +561,30 @@ export function Autocomplete(props: {
 
         // Check for "@" trigger - find the nearest "@" before cursor with no whitespace between
         const text = value.slice(0, offset)
-        const idx = text.lastIndexOf("@")
-        if (idx === -1) return
+        const atIdx = text.lastIndexOf("@")
+        if (atIdx !== -1) {
+          const between = text.slice(atIdx)
+          const before = atIdx === 0 ? undefined : value[atIdx - 1]
+          if ((before === undefined || /\s/.test(before)) && !between.match(/\s/)) {
+            show("@")
+            setStore("index", atIdx)
+            return
+          }
+        }
 
-        const between = text.slice(idx)
-        const before = idx === 0 ? undefined : value[idx - 1]
-        if ((before === undefined || /\s/.test(before)) && !between.match(/\s/)) {
-          show("@")
-          setStore("index", idx)
+        // Check for plugin triggers
+        const customTriggers = sync.data.autocomplete_trigger
+        for (const trigger of customTriggers) {
+          const idx = text.lastIndexOf(trigger)
+          if (idx === -1) continue
+
+          const between = text.slice(idx)
+          const before = idx === 0 ? undefined : value[idx - 1]
+          if ((before === undefined || /\s/.test(before)) && !between.match(/\s/)) {
+            show(trigger)
+            setStore("index", idx)
+            return
+          }
         }
       },
       onKeyDown(e: KeyEvent) {
@@ -577,6 +638,16 @@ export function Autocomplete(props: {
 
           if (e.name === "/") {
             if (props.input().cursorOffset === 0) show("/")
+          }
+
+          // Check for plugin trigger keypresses
+          const customTriggers = sync.data.autocomplete_trigger
+          if (e.name && customTriggers.includes(e.name)) {
+            const cursorOffset = props.input().cursorOffset
+            const charBeforeCursor =
+              cursorOffset === 0 ? undefined : props.input().getTextRange(cursorOffset - 1, cursorOffset)
+            const canTrigger = charBeforeCursor === undefined || charBeforeCursor === "" || /\s/.test(charBeforeCursor)
+            if (canTrigger) show(e.name)
           }
         }
       },
