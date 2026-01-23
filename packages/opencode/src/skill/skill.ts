@@ -41,6 +41,7 @@ export namespace Skill {
 
   const OPENCODE_SKILL_GLOB = new Bun.Glob("{skill,skills}/**/SKILL.md")
   const CLAUDE_SKILL_GLOB = new Bun.Glob("skills/**/SKILL.md")
+  const SKILL_GLOB = new Bun.Glob("**/SKILL.md")
 
   export const state = Instance.state(async () => {
     const skills: Record<string, Info> = {}
@@ -123,6 +124,7 @@ export namespace Skill {
       }
     }
 
+    // Scan additional skill paths from config
     const config = await Config.get()
     for (const skillPath of config.skills?.paths ?? []) {
       const expanded = skillPath.startsWith("~/") ? path.join(os.homedir(), skillPath.slice(2)) : skillPath
@@ -131,7 +133,7 @@ export namespace Skill {
         log.warn("skill path not found", { path: resolved })
         continue
       }
-      for await (const match of OPENCODE_SKILL_GLOB.scan({
+      for await (const match of SKILL_GLOB.scan({
         cwd: resolved,
         absolute: true,
         onlyFiles: true,
