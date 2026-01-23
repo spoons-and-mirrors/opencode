@@ -1630,9 +1630,9 @@ export type Config = {
     }
   }
   /**
-   * Skill configuration for additional skill paths
+   * Additional skill folder paths to scan
    */
-  skill?: {
+  skills?: {
     /**
      * Additional paths to skill folders to scan
      */

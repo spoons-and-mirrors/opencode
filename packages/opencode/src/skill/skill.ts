@@ -125,7 +125,7 @@ export namespace Skill {
 
     // Scan additional skill paths from config
     const config = await Config.get()
-    for (const skillPath of config.skill?.paths ?? []) {
+    for (const skillPath of config.skills?.paths ?? []) {
       // Expand tilde to home directory
       const expanded = skillPath.startsWith("~/") ? path.join(os.homedir(), skillPath.slice(2)) : skillPath
       const resolved = path.isAbsolute(expanded) ? expanded : path.join(Instance.directory, expanded)

@@ -559,10 +559,10 @@ export namespace Config {
   })
   export type Command = z.infer<typeof Command>
 
-  export const Skill = z.object({
+  export const Skills = z.object({
     paths: z.array(z.string()).optional().describe("Additional paths to skill folders to scan"),
   })
-  export type Skill = z.infer<typeof Skill>
+  export type Skills = z.infer<typeof Skills>
 
   export const Agent = z
     .object({
@@ -899,7 +899,7 @@ export namespace Config {
         .record(z.string(), Command)
         .optional()
         .describe("Command configuration, see https://opencode.ai/docs/commands"),
-      skill: Skill.optional().describe("Skill configuration for additional skill paths"),
+      skills: Skills.optional().describe("Additional skill folder paths to scan"),
       watcher: z
         .object({
           ignore: z.array(z.string()).optional(),
