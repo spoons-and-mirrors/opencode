@@ -62,16 +62,11 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         always: [params.name],
         metadata: {},
       })
-      const content = skill.content ?? (await ConfigMarkdown.parse(skill.location)).content
-      const dir = skill.content ? undefined : path.dirname(skill.location)
+      const content = (await ConfigMarkdown.parse(skill.location)).content
+      const dir = path.dirname(skill.location)
 
       // Format output similar to plugin pattern
-      const output = [
-        `## Skill: ${skill.name}`,
-        "",
-        ...(dir ? [`**Base directory**: ${dir}`, ""] : []),
-        content.trim(),
-      ].join("\n")
+      const output = [`## Skill: ${skill.name}`, "", `**Base directory**: ${dir}`, "", content.trim()].join("\n")
 
       return {
         title: `Loaded skill: ${skill.name}`,

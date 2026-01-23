@@ -560,9 +560,7 @@ export namespace Config {
   export type Command = z.infer<typeof Command>
 
   export const Skill = z.object({
-    name: z.string().optional(),
-    description: z.string().optional(),
-    content: z.string(),
+    paths: z.array(z.string()).optional().describe("Additional paths to skill folders to scan"),
   })
   export type Skill = z.infer<typeof Skill>
 
@@ -901,7 +899,7 @@ export namespace Config {
         .record(z.string(), Command)
         .optional()
         .describe("Command configuration, see https://opencode.ai/docs/commands"),
-      skill: z.record(z.string(), Skill).optional().describe("Skill configuration for dynamically registering skills"),
+      skill: Skill.optional().describe("Skill configuration for additional skill paths"),
       watcher: z
         .object({
           ignore: z.array(z.string()).optional(),
