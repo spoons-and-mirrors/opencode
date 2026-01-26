@@ -694,10 +694,8 @@ export namespace SessionPrompt {
       { modelID: input.model.api.id, providerID: input.model.providerID },
       input.agent,
     )
-    const denied = PermissionNext.disabled(
-      items.map((x) => x.id),
-      ruleset,
-    )
+    const mcpTools = await MCP.tools()
+    const denied = PermissionNext.disabled([...items.map((x) => x.id), ...Object.keys(mcpTools)], ruleset)
 
     for (const item of items) {
       if (denied.has(item.id)) continue
@@ -734,7 +732,8 @@ export namespace SessionPrompt {
       })
     }
 
-    for (const [key, item] of Object.entries(await MCP.tools())) {
+    for (const [key, item] of Object.entries(mcpTools)) {
+      if (denied.has(key)) continue
       const execute = item.execute
       if (!execute) continue
 
