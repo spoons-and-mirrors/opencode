@@ -1811,6 +1811,10 @@ export type Config = {
      */
     primary_tools?: Array<string>
     /**
+     * Tools that should only be available to subagents.
+     */
+    subagent_tools?: Array<string>
+    /**
      * Continue the agent loop when a tool call is denied
      */
     continue_loop_on_deny?: boolean

@@ -134,6 +134,10 @@ export namespace ToolRegistry {
     agent?: Agent.Info,
   ) {
     const tools = await all()
+    const config = await Config.get()
+    const primaryTools = new Set(config.experimental?.primary_tools ?? [])
+    const subagentTools = new Set(config.experimental?.subagent_tools ?? [])
+
     const result = await Promise.all(
       tools
         .filter((t) => {
@@ -147,6 +151,9 @@ export namespace ToolRegistry {
             model.modelID.includes("gpt-") && !model.modelID.includes("oss") && !model.modelID.includes("gpt-4")
           if (t.id === "apply_patch") return usePatch
           if (t.id === "edit" || t.id === "write") return !usePatch
+
+          if (agent?.mode === "subagent" && primaryTools.has(t.id)) return false
+          if (agent?.mode === "primary" && subagentTools.has(t.id)) return false
 
           return true
         })

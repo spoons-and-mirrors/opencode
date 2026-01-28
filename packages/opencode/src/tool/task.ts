@@ -9,8 +9,8 @@ import { Agent } from "../agent/agent"
 import { SessionPrompt } from "../session/prompt"
 import { iife } from "@/util/iife"
 import { defer } from "@/util/defer"
-import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
+import { Config } from "../config/config"
 
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
@@ -39,8 +39,6 @@ export const TaskTool = Tool.define("task", async (ctx) => {
     description,
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
-      const config = await Config.get()
-
       // Skip permission check when user explicitly invoked via @ or command subtask
       if (!ctx.extra?.bypassAgentCheck) {
         await ctx.ask({
@@ -58,42 +56,51 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
 
       const hasTaskPermission = agent.permission.some((rule) => rule.permission === "task")
+      const config = await Config.get()
+      const primaryTools = config.experimental?.primary_tools ?? []
+
+      const permissions = [
+        {
+          permission: "todowrite",
+          pattern: "*",
+          action: "deny" as const,
+        },
+        {
+          permission: "todoread",
+          pattern: "*",
+          action: "deny" as const,
+        },
+        ...(hasTaskPermission
+          ? []
+          : [
+              {
+                permission: "task" as const,
+                pattern: "*" as const,
+                action: "deny" as const,
+              },
+            ]),
+        ...primaryTools.map((t) => ({
+          permission: t,
+          pattern: "*" as const,
+          action: "deny" as const,
+        })),
+      ]
 
       const session = await iife(async () => {
         if (params.session_id) {
           const found = await Session.get(params.session_id).catch(() => {})
-          if (found) return found
+          if (found) {
+            await Session.update(found.id, (draft) => {
+              draft.permission = PermissionNext.merge(draft.permission ?? [], permissions)
+            })
+            return found
+          }
         }
 
         return await Session.create({
           parentID: ctx.sessionID,
           title: params.description + ` (@${agent.name} subagent)`,
-          permission: [
-            {
-              permission: "todowrite",
-              pattern: "*",
-              action: "deny",
-            },
-            {
-              permission: "todoread",
-              pattern: "*",
-              action: "deny",
-            },
-            ...(hasTaskPermission
-              ? []
-              : [
-                  {
-                    permission: "task" as const,
-                    pattern: "*" as const,
-                    action: "deny" as const,
-                  },
-                ]),
-            ...(config.experimental?.primary_tools?.map((t) => ({
-              pattern: "*",
-              action: "allow" as const,
-              permission: t,
-            })) ?? []),
-          ],
+          permission: permissions,
         })
       })
       const msg = await MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID })
@@ -152,12 +159,6 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           providerID: model.providerID,
         },
         agent: agent.name,
-        tools: {
-          todowrite: false,
-          todoread: false,
-          ...(hasTaskPermission ? {} : { task: false }),
-          ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((t) => [t, false])),
-        },
         parts: promptParts,
       }).finally(() => {
         unsub()
