@@ -1133,7 +1133,7 @@ function UserMessage(props: {
   const sync = useSync()
   const { theme } = useTheme()
   const [hover, setHover] = createSignal(false)
-  const queued = createMemo(() => props.pending && props.message.id > props.pending)
+  const queued = createMemo(() => props.pending && props.message.id > props.pending && !props.message.hideQueueBadge)
   const color = createMemo(() => (queued() ? theme.accent : local.agent.color(props.message.agent)))
   const metadataVisible = createMemo(() => queued() || ctx.showTimestamps())
 
