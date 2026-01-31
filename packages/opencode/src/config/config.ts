@@ -1162,10 +1162,7 @@ export namespace Config {
         if (lineIndex !== -1 && lines[lineIndex].trim().startsWith("//")) {
           continue // Skip if line is commented
         }
-        let filePath = match.replace(/^\{file:/, "").replace(/\}$/, "")
-        if (filePath.startsWith("~/")) {
-          filePath = path.join(os.homedir(), filePath.slice(2))
-        }
+        const filePath = Filesystem.resolveTilde(match.replace(/^\{file:/, "").replace(/\}$/, ""))
         const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(configDir, filePath)
         const fileContent = (
           await Bun.file(resolvedPath)
@@ -1222,14 +1219,26 @@ export namespace Config {
         await Bun.write(configFilepath, updated).catch(() => {})
       }
       const data = parsed.data
-      if (data.plugin) {
-        for (let i = 0; i < data.plugin.length; i++) {
-          const plugin = data.plugin[i]
-          try {
-            data.plugin[i] = import.meta.resolve!(plugin, configFilepath)
-          } catch (err) {}
+      const expand = (arr?: string[]) => arr?.forEach((v, i) => (arr[i] = Filesystem.resolveTilde(v)))
+
+      expand(data.instructions)
+      expand(data.plugin)
+      if (data.skills) expand(data.skills.paths)
+
+      for (const mcp of Object.values(data.mcp ?? {}))
+        if (typeof mcp === "object" && "type" in mcp && mcp.type === "local") expand(mcp.command)
+      for (const lsp of Object.values(data.lsp ?? {}))
+        if (typeof lsp === "object" && "command" in lsp) expand(lsp.command)
+      for (const fmt of Object.values(data.formatter ?? {}))
+        if (typeof fmt === "object" && "command" in fmt) expand(fmt.command)
+
+      data.plugin = data.plugin?.map((p: string) => {
+        try {
+          return import.meta.resolve!(p, configFilepath)
+        } catch {
+          return p
         }
-      }
+      })
       return data
     }
 

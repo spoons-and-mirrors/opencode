@@ -127,8 +127,7 @@ export namespace Skill {
     // Scan additional skill paths from config
     const config = await Config.get()
     for (const skillPath of config.skills?.paths ?? []) {
-      const expanded = skillPath.startsWith("~/") ? path.join(os.homedir(), skillPath.slice(2)) : skillPath
-      const resolved = path.isAbsolute(expanded) ? expanded : path.join(Instance.directory, expanded)
+      const resolved = path.isAbsolute(skillPath) ? skillPath : path.join(Instance.directory, skillPath)
       if (!(await Filesystem.isDir(resolved))) {
         log.warn("skill path not found", { path: resolved })
         continue

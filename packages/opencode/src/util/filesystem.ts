@@ -1,7 +1,12 @@
 import { realpathSync } from "fs"
 import { dirname, join, relative } from "path"
+import os from "os"
 
 export namespace Filesystem {
+  export function resolveTilde(p: string): string {
+    return p.startsWith("~/") ? join(os.homedir(), p.slice(2)) : p
+  }
+
   export const exists = (p: string) =>
     Bun.file(p)
       .stat()
