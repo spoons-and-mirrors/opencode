@@ -319,7 +319,26 @@ export async function CopilotAuthPlugin(input: PluginInput): Promise<Hooks> {
           throwOnError: true,
         })
         .catch(() => undefined)
-      if (!session || !session.data.parentID) return
+      if (!session?.data.parentID) return
+
+      // if first task of non-copilot parent, let body-based detection charge one credit
+      const parent = await sdk.session
+        .messages({
+          path: { id: session.data.parentID },
+          query: { directory: input.directory, limit: 1 },
+          throwOnError: true,
+        })
+        .catch(() => undefined)
+      const latest = parent?.data[0]
+      const task = latest?.parts?.find((p) => p.type === "tool" && p.tool === "task")
+      if (
+        latest?.info.role === "assistant" &&
+        !latest.info.providerID.includes("github-copilot") &&
+        task?.type === "tool" &&
+        task.metadata?.sessionId === incoming.sessionID
+      )
+        return
+
       // mark subagent sessions as agent initiated matching standard that other copilot tools have
       output.headers["x-initiator"] = "agent"
     },
