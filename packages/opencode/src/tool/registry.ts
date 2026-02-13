@@ -149,7 +149,7 @@ export namespace ToolRegistry {
         })
         .map(async (t) => {
           using _ = log.time(t.id)
-          const tool = await t.init()
+          const tool = await t.init({ agent })
           const output = {
             description: tool.description,
             parameters: tool.parameters,
